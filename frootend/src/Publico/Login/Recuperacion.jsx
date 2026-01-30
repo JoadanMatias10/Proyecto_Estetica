@@ -4,7 +4,7 @@ import Button from "../../components/ui/Button";
 
 export default function Recuperacion() {
   return (
-    <div className="max-w-2xl mx-auto px-4 py-12">
+    <div className="max-w-md mx-auto px-4 py-12">
       <div className="bg-white/80 backdrop-blur-sm border border-rose-200/50 rounded-3xl p-8 shadow-xl">
         <h1 className="text-3xl font-bold bg-gradient-to-r from-rose-600 to-rose-500 bg-clip-text text-transparent">Recuperación de contraseña</h1>
         <p className="text-rose-700/70 mt-2">Te enviaremos un enlace al correo.</p>
