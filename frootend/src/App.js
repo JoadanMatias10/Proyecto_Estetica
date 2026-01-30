@@ -1,0 +1,152 @@
+/*import logo from './logo.svg';
+import './App.css';
+
+function App() {
+  return (
+    <div className="App">
+      <header className="App-header">
+        <img src={logo} className="App-logo" alt="logo" />
+        <p>
+          Edit <code>src/App.js</code> and save to reload.
+        </p>
+        <a
+          className="App-link"
+          href="https://reactjs.org"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Learn React
+        </a>
+      </header>
+    </div>
+  );
+}
+
+export default App;*/
+
+import React from "react";
+import { Routes, Route } from "react-router-dom";
+
+import PublicLayout from "./components/layout/PublicLayout";
+
+// Páginas públicas
+import Home from "./Publico/Home";
+
+// Productos AVYNA
+import Catalogo from "./Publico/ProductosAvyna/Catalogo";
+import DetalleProducto from "./Publico/ProductosAvyna/DetalleProducto";
+import Promociones from "./Publico/ProductosAvyna/Promociones";
+
+// Login
+import InicioSesion from "./Publico/Login/InicioSesion";
+import Registro from "./Publico/Login/Registro";
+import Recuperacion from "./Publico/Login/Recuperacion";
+
+// Servicios
+import ConsultaServicio from "./Publico/Servicios/ConsultaServicio";
+
+// Información de la empresa
+import Contactos from "./Publico/InformacionEmpresa/Contactos";
+import QuienesSomos from "./Publico/InformacionEmpresa/QuienesSomos";
+import MisionVisionValores from "./Publico/InformacionEmpresa/MisionVisionValores";
+import RedesSociales from "./Publico/InformacionEmpresa/RedesSociales";
+import PoliticaPrivacidad from "./Publico/InformacionEmpresa/PoliticaPrivacidad";
+
+//RUTAS DEL CLIENTE 
+import ClientLayout from "./components/layout/ClientLayout";
+
+import DashboardCliente from "./Cliente/DashboardCliente";
+
+import CatalogoProductos from "./Cliente/ProductosAvyna/CatalogoProductos";
+import DetalleProductoCliente from "./Cliente/ProductosAvyna/DetalleProductoCliente";
+import PagoProducto from "./Cliente/ProductosAvyna/PagoProducto";
+import CarritoCompra from "./Cliente/ProductosAvyna/CarritoCompra";
+import EstadoCarrito from "./Cliente/ProductosAvyna/EstadoCarrito";
+
+import AgendarCancelarCitas from "./Cliente/Citas/AgendarCancelarCitas";
+import ReprogramarCita from "./Cliente/Citas/ReprogramarCita";
+import CalendarioDisponibilidad from "./Cliente/Citas/CalendarioDisponibilidad";
+
+import ConsultaServicioCliente from "./Cliente/Servicios/ConsultaServicioCliente";
+import PagoServicios from "./Cliente/Servicios/PagoServicios";
+
+import RecordarCita from "./Cliente/Notificaciones/RecordarCita";
+import NotificarCitas from "./Cliente/Notificaciones/NotificarCitas";
+
+import HistorialPago from "./Cliente/Pagos/HistorialPago";
+
+import PerfilCliente from "./Cliente/Perfil/PerfilCliente";
+import InformacionCliente from "./Cliente/Perfil/InformacionCliente";
+import NotificacionesCliente from "./Cliente/Perfil/NotificacionesCliente";
+
+
+function NotFound() {
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-16">
+      <h1 className="text-3xl font-bold text-pink-700">404</h1>
+      <p className="text-pink-800 mt-2">Página no encontrada.</p>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route element={<PublicLayout />}>
+        <Route path="/" element={<Home />} />
+
+        <Route path="/productos" element={<Catalogo />} />
+        <Route path="/productos/:id" element={<DetalleProducto />} />
+        <Route path="/promociones" element={<Promociones />} />
+
+        <Route path="/login" element={<InicioSesion />} />
+        <Route path="/registro" element={<Registro />} />
+        <Route path="/recuperar" element={<Recuperacion />} />
+
+        <Route path="/servicios" element={<ConsultaServicio />} />
+
+        <Route path="/contactos" element={<Contactos />} />
+        <Route path="/quienes-somos" element={<QuienesSomos />} />
+        <Route path="/mision-vision-valores" element={<MisionVisionValores />} />
+        <Route path="/redes-sociales" element={<RedesSociales />} />
+        <Route path="/politica-privacidad" element={<PoliticaPrivacidad />} />
+
+        <Route path="*" element={<NotFound />} />
+
+      <Route path="/cliente" element={<ClientLayout />}>
+       <Route index element={<DashboardCliente />} />
+
+        <Route path="productos" element={<CatalogoProductos />} />
+        <Route path="productos/:id" element={<DetalleProductoCliente />} />
+        <Route path="productos/pago/:id" element={<PagoProducto />} />
+
+        <Route path="carrito" element={<CarritoCompra />} />
+        <Route path="carrito/estado" element={<EstadoCarrito />} />
+
+        <Route path="citas" element={<AgendarCancelarCitas />} />
+        <Route path="citas/reprogramar" element={<ReprogramarCita />} />
+        <Route path="citas/calendario" element={<CalendarioDisponibilidad />} />
+
+        <Route path="servicios" element={<ConsultaServicioCliente />} />
+        <Route path="servicios/pago" element={<PagoServicios />} />
+
+        <Route path="notificaciones" element={<RecordarCita />} />
+        <Route path="notificaciones/enviar" element={<NotificarCitas />} />
+
+        <Route path="pagos" element={<HistorialPago />} />
+
+        <Route path="perfil" element={<PerfilCliente />} />
+        <Route path="perfil/info" element={<InformacionCliente />} />
+        <Route path="perfil/notificaciones" element={<NotificacionesCliente />} />
+      
+        </Route>
+      </Route>
+    </Routes>
+    
+  );
+
+
+
+  
+}
+
