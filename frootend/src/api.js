@@ -1,6 +1,15 @@
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+const normalizeBaseUrl = (value) => {
+  const base = (value || "http://localhost:5000").trim().replace(/\/+$/, "");
+  if (base.endsWith("/api")) return base;
+  return `${base}/api`;
+};
 
-const buildUrl = (path) => `${API_URL}${path}`;
+export const API_BASE_URL = normalizeBaseUrl(process.env.REACT_APP_API_URL);
+
+const buildUrl = (path) => {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${API_BASE_URL}${normalizedPath}`;
+};
 
 export const endpoints = {
   register: buildUrl("/public/register"),
@@ -78,4 +87,4 @@ export async function requestJson(url, options = {}) {
   return data;
 }
 
-export default API_URL;
+export default API_BASE_URL;
