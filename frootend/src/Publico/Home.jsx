@@ -13,16 +13,16 @@ export default function Home() {
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45 }}
-            className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight text-rose-800"
+            className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight text-slate-800"
           >
-            Renueva tu estilo con <span className="bg-gradient-to-r from-rose-500 to-rose-600 bg-clip-text text-transparent">expertos</span>
+            Renueva tu estilo con <span className="page-title">expertos</span>
           </motion.h2>
 
           <motion.p
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.08 }}
-            className="text-lg md:text-xl text-rose-700/80 leading-relaxed"
+            className="text-lg md:text-xl text-slate-600 leading-relaxed"
           >
             Agenda un corte con estilistas certificados y descubre la línea AVYNA para un cuidado excepcional.
           </motion.p>
@@ -41,30 +41,16 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-4 pt-4">
-            <div className="flex -space-x-2">
-              {[1, 2, 3, 4, 5].map((s) => (
-                <div
-                  key={s}
-                  className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-yellow-400 bg-white border-rose-200 shadow-sm"
-                  style={{ marginLeft: s > 1 ? "-8px" : "0" }}
-                >
-                  ★
-                </div>
-              ))}
-            </div>
-            <p className="text-sm font-medium text-rose-700">+1,200 clientes satisfechos</p>
-          </div>
         </div>
 
         <motion.div
           initial={{ opacity: 0, x: 35 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.15 }}
-          className="rounded-3xl overflow-hidden shadow-xl bg-gradient-to-br from-rose-200 to-rose-300"
+          className="rounded-3xl overflow-hidden shadow-xl bg-gradient-to-br from-rose-200 to-violet-200"
         >
           <img
-            src="https://placehold.co/900x600/FFD1E3/C94FA0?text=Estetica+Panamericana"
+            src="https://placehold.co/900x600/DDD6FE/7C3AED?text=Estetica+Panamericana"
             alt="Estética Panamericana"
             className="w-full h-[420px] md:h-[520px] object-cover"
             style={{ filter: "brightness(0.95)" }}
@@ -72,20 +58,20 @@ export default function Home() {
         </motion.div>
       </div>
 
-      <div className="border-t-2 border-rose-200/50 max-w-xs mx-auto my-16"></div>
+      <div className="border-t-2 border-slate-200/50 max-w-xs mx-auto my-16"></div>
 
       {/* Carrusel de Servicios Destacados */}
       <section className="mb-16">
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-rose-600 to-rose-500 bg-clip-text text-transparent mb-2">
+          <h2 className="page-title mb-2">
             Descubre Nuestra Experiencia
           </h2>
-          <p className="text-rose-700/70">Transformamos tu estilo con pasión y profesionalismo</p>
+          <p className="page-subtitle">Transformamos tu estilo con pasión y profesionalismo</p>
         </div>
         <Carousel />
       </section>
 
-      <div className="border-t-2 border-rose-200/50 max-w-xs mx-auto my-16"></div>
+      <div className="border-t-2 border-slate-200/50 max-w-xs mx-auto my-16"></div>
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {[
@@ -93,10 +79,10 @@ export default function Home() {
           { icon: "🧴", title: "Productos AVYNA", desc: "Catálogo, detalle y promos.", to: "/productos" },
           { icon: "🏢", title: "Empresa", desc: "Quiénes somos y contacto.", to: "/quienes-somos" },
         ].map((c) => (
-          <div key={c.title} className="rounded-2xl p-8 bg-white/80 backdrop-blur-sm border border-rose-200/50 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+          <div key={c.title} className="card card-hover p-8">
             <div className="text-4xl mb-3">{c.icon}</div>
-            <h3 className="text-xl font-bold text-rose-700">{c.title}</h3>
-            <p className="text-rose-700/70 mt-2 mb-5">{c.desc}</p>
+            <h3 className="section-title">{c.title}</h3>
+            <p className="page-subtitle mt-2 mb-5">{c.desc}</p>
             <Link to={c.to}>
               <Button variant="outline" className="px-5 py-2.5">
                 Ir
@@ -108,4 +94,3 @@ export default function Home() {
     </div>
   );
 }
-

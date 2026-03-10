@@ -9,19 +9,19 @@ const pagos = [
 export default function HistorialPago() {
   return (
     <div>
-      <h1 className="text-3xl font-bold bg-gradient-to-r from-rose-600 to-rose-500 bg-clip-text text-transparent">Historial de pago</h1>
-      <p className="text-rose-700/70 mt-2">Pagos de productos y servicios.</p>
+      <h1 className="page-title">Historial de pago</h1>
+      <p className="page-subtitle mt-2">Pagos de productos y servicios.</p>
 
-      <div className="mt-8 bg-white/80 backdrop-blur-sm border border-rose-200/50 rounded-2xl overflow-hidden shadow-md">
-        <div className="p-6 bg-rose-50/80 border-b border-rose-100 font-bold text-rose-700 uppercase text-sm tracking-wider">
+      <div className="card mt-8 rounded-2xl overflow-hidden shadow-md">
+        <div className="p-6 bg-violet-50/80 border-b border-violet-100 font-bold text-violet-700 uppercase text-sm tracking-wider">
           Movimientos recientes
         </div>
-        <div className="divide-y divide-rose-100">
+        <div className="divide-y divide-slate-100">
           {pagos.map((p) => (
-            <div key={p.id} className="p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 hover:bg-rose-50/30 transition-colors">
+            <div key={p.id} className="p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 hover:bg-slate-50/50 transition-colors">
               <div>
-                <div className="font-bold text-rose-800 text-lg">{p.concepto}</div>
-                <div className="text-sm text-rose-500 mt-1 font-medium bg-rose-50 w-fit px-2 py-0.5 rounded-lg border border-rose-100">{p.tipo} • {p.fecha} • <span className="font-mono text-rose-400">{p.id}</span></div>
+                <div className="font-bold text-slate-800 text-lg">{p.concepto}</div>
+                <div className="text-sm text-slate-500 mt-1 font-medium bg-slate-50 w-fit px-2 py-0.5 rounded-lg border border-slate-200">{p.tipo} • {p.fecha} • <span className="font-mono text-slate-400">{p.id}</span></div>
               </div>
               <div className="flex items-center gap-6 justify-between md:justify-end">
                 <div className="font-bold text-2xl text-rose-600">${p.total}</div>

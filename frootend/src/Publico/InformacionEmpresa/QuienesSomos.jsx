@@ -1,27 +1,74 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import { fetchPublicCompanyInfo } from "../../utils/publicCatalogApi";
+
+function parseEsenciaItems(rawText) {
+  if (!rawText) return [];
+  const unique = new Set(
+    rawText
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  );
+  return Array.from(unique);
+}
 
 export default function QuienesSomos() {
+  const [companyInfo, setCompanyInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    const loadCompanyInfo = async () => {
+      setLoading(true);
+      setErrorMessage("");
+      try {
+        const info = await fetchPublicCompanyInfo();
+        setCompanyInfo(info);
+      } catch (error) {
+        setErrorMessage(error.message || "No fue posible cargar informacion de la empresa.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCompanyInfo();
+  }, []);
+
+  const esenciaItems = useMemo(
+    () => parseEsenciaItems(companyInfo?.quienesSomosEsencia || ""),
+    [companyInfo?.quienesSomosEsencia]
+  );
+
+  if (loading) {
+    return <LoadingSpinner text="Cargando informacion..." fullScreen={false} className="py-20" />;
+  }
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-bold bg-gradient-to-r from-rose-600 to-rose-500 bg-clip-text text-transparent">¿Quiénes somos?</h1>
-      <p className="text-rose-700/70 mt-3 leading-relaxed">
-        En Estética Panamericana combinamos pasión, profesionalismo y productos de calidad para realzar tu belleza.
-      </p>
+      <h1 className="page-title">Quienes somos</h1>
+      {errorMessage ? (
+        <p className="mt-3 text-red-600 text-sm">{errorMessage}</p>
+      ) : (
+        <p className="text-slate-600 mt-3 leading-relaxed">
+          {companyInfo?.quienesSomosTexto}
+        </p>
+      )}
 
-      <div className="mt-8 rounded-2xl p-7 bg-white/80 backdrop-blur-sm border border-rose-200/50 shadow-md">
-        <h3 className="font-bold text-rose-700 text-xl">Nuestra esencia</h3>
-        <ul className="mt-3 space-y-2 text-rose-700/70">
-          <li>✓ Atención personalizada</li>
-          <li>✓ Estilistas certificados</li>
-          <li>✓ Experiencia premium</li>
-          <li>✓ Productos profesionales AVYNA</li>
+      <div className="card mt-8 p-7">
+        <h3 className="section-title">Nuestra esencia</h3>
+        <ul className="mt-3 space-y-2 text-slate-600">
+          {esenciaItems.map((item) => (
+            <li key={item}>- {item}</li>
+          ))}
+          {esenciaItems.length === 0 && <li>- Informacion no disponible</li>}
         </ul>
 
-        <p className="text-sm text-rose-700/70 mt-6">
-          ¿Quieres ver misión, visión y valores?{" "}
-          <Link className="font-semibold text-rose-600 hover:text-rose-700 transition-colors" to="/mision-vision-valores">
-            Ver aquí →
+        <p className="text-sm text-slate-500 mt-6">
+          Quieres ver mision, vision y valores?{" "}
+          <Link className="font-semibold text-violet-600 hover:text-violet-700 transition-colors" to="/mision-vision-valores">
+            Ver aqui ->
           </Link>
         </p>
       </div>
