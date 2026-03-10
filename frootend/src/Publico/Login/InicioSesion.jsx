@@ -39,7 +39,14 @@ export default function InicioSesion() {
         if (response.ok) {
           localStorage.setItem("token", data.token);
           localStorage.setItem("user", JSON.stringify(data.user));
-          navigate("/cliente");
+
+          if (data.user?.role === "admin") {
+            localStorage.setItem("adminToken", data.token);
+            localStorage.setItem("adminUser", JSON.stringify(data.user));
+            navigate("/admin");
+          } else {
+            navigate("/cliente");
+          }
         } else {
           setServerError(data.errors ? data.errors[0] : "Error al iniciar sesion");
         }

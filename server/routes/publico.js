@@ -119,8 +119,11 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   const errors = [];
   const { correo, password } = req.body;
+  const identifier = normalizeString(correo).toLowerCase();
 
-  validateEmail(correo, errors);
+  if (!identifier) {
+    errors.push("Correo o usuario es obligatorio.");
+  }
   if (!password) {
     errors.push("Contrasena es obligatoria.");
   }
@@ -129,12 +132,11 @@ router.post("/login", async (req, res) => {
     return res.status(400).json({ errors });
   }
 
-  const user = await User.findOne({ correo: normalizeString(correo).toLowerCase() });
+  const user = await User.findOne({
+    $or: [{ correo: identifier }, { username: identifier }],
+  });
   if (!user) {
     return res.status(401).json({ errors: ["Credenciales invalidas."] });
-  }
-  if (user.role !== "client") {
-    return res.status(403).json({ errors: ["Esta cuenta debe iniciar sesion desde el acceso administrador."] });
   }
 
   const isValid = verifyPassword(password, user.passwordSalt, user.passwordHash);

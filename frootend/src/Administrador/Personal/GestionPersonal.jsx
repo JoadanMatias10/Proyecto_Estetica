@@ -38,7 +38,9 @@ export default function GestionPersonal() {
   const handleUnauthorized = useCallback(() => {
     localStorage.removeItem("adminToken");
     localStorage.removeItem("adminUser");
-    navigate("/admin/login", { replace: true });
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/login", { replace: true });
   }, [navigate]);
 
   const formatStaffError = useCallback((error, fallback) => {

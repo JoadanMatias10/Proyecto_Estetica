@@ -12,22 +12,22 @@ export default function AdminLayout() {
 
   useEffect(() => {
     const verifyAdminSession = async () => {
-      const adminToken = localStorage.getItem("adminToken");
-      const rawAdminUser = localStorage.getItem("adminUser");
+      const adminToken = localStorage.getItem("adminToken") || localStorage.getItem("token");
+      const rawAdminUser = localStorage.getItem("adminUser") || localStorage.getItem("user");
 
       if (!adminToken || !rawAdminUser) {
-        navigate("/admin/login", { replace: true });
+        navigate("/login", { replace: true });
         return;
       }
 
       try {
         const parsed = JSON.parse(rawAdminUser);
         if (!parsed || parsed.role !== "admin") {
-          navigate("/admin/login", { replace: true });
+          navigate("/login", { replace: true });
           return;
         }
       } catch (_error) {
-        navigate("/admin/login", { replace: true });
+        navigate("/login", { replace: true });
         return;
       }
 
@@ -39,7 +39,9 @@ export default function AdminLayout() {
         if (!response.ok) {
           localStorage.removeItem("adminToken");
           localStorage.removeItem("adminUser");
-          navigate("/admin/login", { replace: true });
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          navigate("/login", { replace: true });
           return;
         }
 
@@ -48,7 +50,9 @@ export default function AdminLayout() {
       } catch (_error) {
         localStorage.removeItem("adminToken");
         localStorage.removeItem("adminUser");
-        navigate("/admin/login", { replace: true });
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        navigate("/login", { replace: true });
         return;
       } finally {
         setCheckingAuth(false);

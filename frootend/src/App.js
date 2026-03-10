@@ -101,7 +101,6 @@ import InformacionEmpresa from "./Administrador/Empresa/InformacionEmpresa";
 import ControlStock from "./Administrador/Inventario/ControlStock";
 import CategoriasServicios from "./Administrador/Servicios/CategoriasServicios";
 import GestionCarrusel from "./Administrador/Marketing/GestionCarrusel";
-import InicioSesionAdmin from "./Administrador/Login/InicioSesionAdmin";
 import GestionRespaldos from "./Administrador/Respaldos/GestionRespaldos";
 
 export default function App() {
@@ -160,8 +159,6 @@ export default function App() {
         <Route path="perfil/info" element={<InformacionCliente />} />
         <Route path="perfil/notificaciones" element={<NotificacionesCliente />} />
       </Route>
-
-      <Route path="/admin/login" element={<InicioSesionAdmin />} />
 
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<DashboardAdmin />} />
