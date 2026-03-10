@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Modal from "../../components/ui/Modal";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import SidebarIcon from "../../components/ui/SidebarIcon";
 import { endpoints, requestJson } from "../../api";
 
 const getDefaultFormValues = (category = null) => ({
@@ -164,11 +165,21 @@ export default function CategoriasProductos() {
                     </td>
                     <td className="px-6 py-4 text-slate-500 max-w-sm truncate">{category.descripcion || "-"}</td>
                     <td className="px-6 py-4 text-right space-x-2">
-                      <button onClick={() => openModal(category)} className="btn-edit">
-                        Editar
+                      <button
+                        type="button"
+                        onClick={() => openModal(category)}
+                        className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-orange-200 bg-white text-orange-500 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 transition-colors shadow-sm"
+                        aria-label="Editar categoria"
+                      >
+                        <SidebarIcon name="edit" className="h-5 w-5" />
                       </button>
-                      <button onClick={() => handleDelete(category.id)} className="btn-delete">
-                        Eliminar
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(category.id)}
+                        className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-red-200 bg-white text-red-500 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors shadow-sm"
+                        aria-label="Eliminar categoria"
+                      >
+                        <SidebarIcon name="delete" className="h-5 w-5" />
                       </button>
                     </td>
                   </tr>

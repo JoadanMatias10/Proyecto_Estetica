@@ -8,7 +8,7 @@ function IconWrap({ children, className = "" }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.9"
+      strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
       className={`${baseClass} ${className}`}
@@ -224,6 +224,16 @@ export default function SidebarIcon({ name, className = "" }) {
         <IconWrap className={className}>
           <path d="M4 20h4l10-10-4-4L4 16v4Z" />
           <path d="m12 6 4 4" />
+        </IconWrap>
+      );
+    case "delete":
+      return (
+        <IconWrap className={className}>
+          <path d="M4 7h16" />
+          <path d="M10 11v6" />
+          <path d="M14 11v6" />
+          <path d="M6 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2L18 7" />
+          <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7" />
         </IconWrap>
       );
     default:

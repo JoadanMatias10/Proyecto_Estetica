@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Modal from "../../components/ui/Modal";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import SidebarIcon from "../../components/ui/SidebarIcon";
 import { endpoints, requestJson } from "../../api";
 
 const getDefaultFormValues = (brand = null) => ({
   nombre: brand?.nombre || "",
   pais: brand?.pais || "",
   estado: brand?.estado || "Activa",
-  descripcion: brand?.descripcion || "",
 });
 
 function getAdminToken() {
@@ -86,7 +86,6 @@ export default function MarcasProductos() {
         nombre,
         pais: formValues.pais.trim(),
         estado: formValues.estado,
-        descripcion: formValues.descripcion.trim(),
       };
 
       if (currentBrand) {
@@ -142,7 +141,6 @@ export default function MarcasProductos() {
                   <th className="px-6 py-4">Marca</th>
                   <th className="px-6 py-4">Pais</th>
                   <th className="px-6 py-4">Estado</th>
-                  <th className="px-6 py-4">Descripcion</th>
                   <th className="px-6 py-4 text-right">Acciones</th>
                 </tr>
               </thead>
@@ -162,20 +160,29 @@ export default function MarcasProductos() {
                         {brand.estado}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-500 max-w-sm truncate">{brand.descripcion || "-"}</td>
                     <td className="px-6 py-4 text-right space-x-2">
-                      <button onClick={() => openModal(brand)} className="btn-edit">
-                        Editar
+                      <button
+                        type="button"
+                        onClick={() => openModal(brand)}
+                        className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-orange-200 bg-white text-orange-500 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 transition-colors shadow-sm"
+                        aria-label="Editar marca"
+                      >
+                        <SidebarIcon name="edit" className="h-5 w-5" />
                       </button>
-                      <button onClick={() => handleDelete(brand.id)} className="btn-delete">
-                        Eliminar
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(brand.id)}
+                        className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-red-200 bg-white text-red-500 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors shadow-sm"
+                        aria-label="Eliminar marca"
+                      >
+                        <SidebarIcon name="delete" className="h-5 w-5" />
                       </button>
                     </td>
                   </tr>
                 ))}
                 {marcasOrdenadas.length === 0 && (
                   <tr>
-                    <td colSpan="5" className="px-6 py-8 text-center text-slate-400">
+                    <td colSpan="4" className="px-6 py-8 text-center text-slate-400">
                       No hay marcas registradas.
                     </td>
                   </tr>
@@ -217,17 +224,6 @@ export default function MarcasProductos() {
                 <option value="Inactiva">Inactiva</option>
               </select>
             </div>
-          </div>
-          <div>
-            <label className="form-label">Descripcion</label>
-            <textarea
-              name="descripcion"
-              value={formValues.descripcion}
-              onChange={handleInputChange}
-              rows="3"
-              className="form-input resize-none"
-              placeholder="Descripcion interna para esta marca..."
-            />
           </div>
           <div className="pt-4 flex justify-end gap-3">
             <button

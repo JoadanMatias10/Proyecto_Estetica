@@ -116,7 +116,6 @@ router.post("/product-brands", async (req, res) => {
   const nombre = sanitizeText(req.body.nombre);
   const pais = sanitizeText(req.body.pais);
   const estado = sanitizeState(req.body.estado);
-  const descripcion = sanitizeText(req.body.descripcion);
 
   if (!nombre) {
     return res.status(400).json({ errors: ["Nombre de marca es obligatorio."] });
@@ -127,7 +126,7 @@ router.post("/product-brands", async (req, res) => {
     return res.status(409).json({ errors: ["Ya existe una marca con ese nombre."] });
   }
 
-  const brand = await ProductBrand.create({ nombre, pais, estado, descripcion });
+  const brand = await ProductBrand.create({ nombre, pais, estado });
   return res.status(201).json({ brand: mapId(brand.toObject()) });
 });
 
@@ -145,7 +144,6 @@ router.put("/product-brands/:id", async (req, res) => {
   const nombre = sanitizeText(req.body.nombre);
   const pais = sanitizeText(req.body.pais);
   const estado = sanitizeState(req.body.estado);
-  const descripcion = sanitizeText(req.body.descripcion);
 
   if (!nombre) {
     return res.status(400).json({ errors: ["Nombre de marca es obligatorio."] });
@@ -160,7 +158,6 @@ router.put("/product-brands/:id", async (req, res) => {
   current.nombre = nombre;
   current.pais = pais;
   current.estado = estado;
-  current.descripcion = descripcion;
   await current.save();
 
   if (previousName !== nombre) {

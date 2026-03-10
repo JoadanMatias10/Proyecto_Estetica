@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import SidebarIcon from "../../components/ui/SidebarIcon";
 import { endpoints, requestJson } from "../../api";
 
 const getDefaultFormValues = (promotion = null) => ({
@@ -138,8 +139,22 @@ export default function Promociones() {
           {promociones.map((promo) => (
             <div key={promo.id} className="bg-white p-6 rounded-2xl shadow-sm border border-violet-100 hover:shadow-md transition-shadow relative group">
               <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => openModal(promo)} className="text-violet-500 hover:text-violet-700">Editar</button>
-                <button onClick={() => handleDelete(promo.id)} className="text-rose-500 hover:text-rose-700">Eliminar</button>
+                <button
+                  type="button"
+                  onClick={() => openModal(promo)}
+                  className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-orange-200 bg-white text-orange-500 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 transition-colors shadow-sm"
+                  aria-label="Editar promocion"
+                >
+                  <SidebarIcon name="edit" className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(promo.id)}
+                  className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-red-200 bg-white text-red-500 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors shadow-sm"
+                  aria-label="Eliminar promocion"
+                >
+                  <SidebarIcon name="delete" className="h-5 w-5" />
+                </button>
               </div>
               <div className={`text-xs font-bold uppercase tracking-wider mb-2 ${promo.estado === "Activa" ? "text-emerald-600" : "text-slate-400"}`}>
                 {promo.estado}

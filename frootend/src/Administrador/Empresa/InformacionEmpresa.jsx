@@ -253,10 +253,11 @@ export default function InformacionEmpresa() {
           <button
             type="button"
             onClick={openEdit}
-            className="inline-flex items-center gap-2 text-violet-600 font-semibold hover:text-violet-700 transition-colors"
+            className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-slate-200 bg-white text-orange-500 hover:text-orange-600 hover:border-orange-200 hover:bg-orange-50 transition-colors shadow-sm"
+            aria-label="Editar informacion"
           >
-            <SidebarIcon name="edit" className="h-4 w-4" />
-            <span>Editar Informacion</span>
+            <SidebarIcon name="edit" className="h-5 w-5" />
+            <span className="sr-only">Editar Informacion</span>
           </button>
         )}
       </div>
