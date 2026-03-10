@@ -4,11 +4,11 @@
 
 /* ===================================
    🎨 Sistema de Diseño - Estética Panamericana
-   Paleta de Colores Rosa Pastel Profesional
+   Paleta Multicolor: Rosa + Violeta + Ámbar + Slate
    =================================== */
 
 :root {
-  /* Colores Rosa Pastel - Principales */
+  /* Colores Rosa - Primario (branding) */
   --rose-50: #FFF9FC;
   --rose-100: #FFE5F1;
   --rose-200: #FFD1E3;
@@ -16,36 +16,48 @@
   --rose-400: #FF8DC7;
   --rose-500: #E06BB8;
   --rose-600: #C94FA0;
-  --rose-700: #9B6B8F;
 
-  /* Colores de Texto */
-  --text-primary: #4A3142;
-  --text-secondary: #9B6B8F;
-  --text-light: #C8B3C0;
+  /* Colores Violeta - Secundario (acentos UI) */
+  --violet-50: #F5F3FF;
+  --violet-100: #EDE9FE;
+  --violet-200: #DDD6FE;
+  --violet-300: #C4B5FD;
+  --violet-400: #A78BFA;
+  --violet-500: #8B5CF6;
+  --violet-600: #7C3AED;
+
+  /* Colores Ámbar - Acento cálido (precios, estrellas) */
+  --amber-400: #FBBF24;
+  --amber-500: #F59E0B;
+
+  /* Colores de Texto (neutros) */
+  --text-primary: #334155;
+  --text-secondary: #64748b;
+  --text-light: #94a3b8;
   --text-white: #FFFFFF;
 
   /* Fondos */
-  --bg-primary: #FFF9FC;
-  --bg-secondary: #FFE5F1;
+  --bg-primary: #FAFBFF;
+  --bg-secondary: #F3F0FF;
   --bg-white: #FFFFFF;
   --bg-glass: rgba(255, 255, 255, 0.85);
 
   /* Gradientes */
-  --gradient-primary: linear-gradient(135deg, #FFE5F1 0%, #FFD1E3 100%);
-  --gradient-soft: linear-gradient(180deg, #FFF9FC 0%, #FFE5F1 100%);
-  --gradient-hero: linear-gradient(135deg, #FF8DC7 0%, #E06BB8 50%, #C94FA0 100%);
-  --gradient-card: linear-gradient(145deg, #FFFFFF 0%, #FFF9FC 100%);
+  --gradient-primary: linear-gradient(135deg, #FFE5F1 0%, #EDE9FE 100%);
+  --gradient-soft: linear-gradient(180deg, #FAFBFF 0%, #F3F0FF 100%);
+  --gradient-hero: linear-gradient(135deg, #FF8DC7 0%, #8B5CF6 100%);
+  --gradient-card: linear-gradient(145deg, #FFFFFF 0%, #FAFBFF 100%);
 
   /* Sombras */
-  --shadow-sm: 0 2px 8px rgba(224, 107, 184, 0.08);
-  --shadow-md: 0 4px 16px rgba(224, 107, 184, 0.12);
-  --shadow-lg: 0 8px 32px rgba(224, 107, 184, 0.16);
-  --shadow-xl: 0 16px 48px rgba(224, 107, 184, 0.2);
-  --shadow-glow: 0 4px 24px rgba(255, 141, 199, 0.3);
+  --shadow-sm: 0 2px 8px rgba(100, 116, 139, 0.08);
+  --shadow-md: 0 4px 16px rgba(100, 116, 139, 0.12);
+  --shadow-lg: 0 8px 32px rgba(100, 116, 139, 0.16);
+  --shadow-xl: 0 16px 48px rgba(100, 116, 139, 0.2);
+  --shadow-glow: 0 4px 24px rgba(139, 92, 246, 0.25);
 
   /* Bordes */
-  --border-light: #FFD1E3;
-  --border-medium: #FFB7D5;
+  --border-light: #E2E8F0;
+  --border-medium: #CBD5E1;
   --border-radius-sm: 8px;
   --border-radius-md: 12px;
   --border-radius-lg: 16px;
@@ -82,6 +94,141 @@ body {
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* ===================================
+   🧩 Clases Reutilizables (Design Tokens)
+   =================================== */
+
+@layer components {
+
+  /* --- Tarjetas --- */
+  .card {
+    @apply bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-sm;
+  }
+
+  .card-hover {
+    @apply hover:shadow-lg transition-all duration-300 hover:-translate-y-1;
+  }
+
+  /* --- Títulos --- */
+  .page-title {
+    @apply text-3xl font-bold bg-gradient-to-r from-rose-500 to-violet-600 bg-clip-text text-transparent;
+  }
+
+  .page-subtitle {
+    @apply text-slate-500 mt-1;
+  }
+
+  .section-title {
+    @apply text-xl font-bold text-slate-800;
+  }
+
+  /* --- Formularios --- */
+  .form-label {
+    @apply text-sm font-semibold text-slate-700 mb-1 block;
+  }
+
+  .form-input {
+    @apply w-full rounded-xl border-2 border-slate-200 bg-white/50 px-4 py-3 focus:ring-2 focus:ring-violet-300 focus:border-violet-400 outline-none transition-all;
+  }
+
+  .search-input {
+    @apply w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-slate-200 focus:outline-none focus:ring-4 focus:ring-violet-300/50 focus:border-violet-400 transition-all text-slate-800 placeholder-slate-400 bg-white/50;
+  }
+
+  /* --- Sidebar --- */
+  .sidebar {
+    @apply bg-cyan-50/95 backdrop-blur-md border-r border-cyan-200 shadow-sm;
+  }
+
+  .sidebar-label {
+    @apply text-xs font-bold text-violet-400 uppercase tracking-wider mb-4 px-2;
+  }
+
+  .nav-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200;
+  }
+
+  .nav-active {
+    @apply bg-gradient-to-r from-violet-100 to-rose-50 text-violet-700 shadow-sm border border-violet-200/50;
+  }
+
+  .nav-inactive {
+    @apply text-slate-600 hover:bg-violet-50 hover:text-violet-600 hover:shadow-sm;
+  }
+
+  /* --- Estadísticas / cards pequeñas --- */
+  .stat-card {
+    @apply bg-white p-6 rounded-2xl shadow-sm border flex items-center gap-4;
+  }
+
+  .icon-box {
+    @apply p-3 rounded-xl text-2xl;
+  }
+
+  /* --- Badges --- */
+  .badge {
+    @apply px-2 py-1 rounded-md text-xs font-semibold;
+  }
+
+  .badge-rose {
+    @apply bg-rose-50 text-rose-600;
+  }
+
+  .badge-violet {
+    @apply bg-violet-50 text-violet-600;
+  }
+
+  .badge-amber {
+    @apply bg-amber-50 text-amber-600;
+  }
+
+  .badge-emerald {
+    @apply bg-emerald-50 text-emerald-600;
+  }
+
+  /* --- Botones de acción en tablas --- */
+  /* --- Botones de acción en tablas --- */
+  .btn-edit {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-violet-700 bg-violet-100 hover:bg-violet-200 transition-colors duration-200 border border-transparent hover:border-violet-300;
+  }
+
+  .btn-delete {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 bg-rose-100 hover:bg-rose-200 transition-colors duration-200 border border-transparent hover:border-rose-300;
+  }
+
+  .btn-view {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-cyan-700 bg-cyan-100 hover:bg-cyan-200 transition-colors duration-200 border border-transparent hover:border-cyan-300;
+  }
+
+  /* --- Redes sociales --- */
+  .social-icon {
+    @apply w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-rose-500 hover:text-violet-600 hover:bg-violet-50 hover:shadow-md transition-all duration-300 hover:scale-110;
+  }
+
+  /* --- Tabla --- */
+  .table-container {
+    @apply bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden;
+  }
+
+  .table-header {
+    @apply bg-slate-50 text-slate-800 font-semibold uppercase text-xs;
+  }
+
+  .table-cell {
+    @apply px-6 py-4;
+  }
+
+  /* --- Quick action card (Admin) --- */
+  .action-card {
+    @apply p-4 bg-white hover:bg-violet-50 border border-slate-100 hover:border-violet-200 rounded-xl transition-all shadow-sm;
+  }
+
+  /* --- Tip box (sidebar) --- */
+  .tip-box {
+    @apply mt-6 p-4 rounded-xl bg-gradient-to-br from-violet-50 to-white border border-violet-100 shadow-sm;
+  }
 }
 
 /* ===================================

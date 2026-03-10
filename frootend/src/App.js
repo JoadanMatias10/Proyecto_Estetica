@@ -52,6 +52,8 @@ import MisionVisionValores from "./Publico/InformacionEmpresa/MisionVisionValore
 import RedesSociales from "./Publico/InformacionEmpresa/RedesSociales";
 import PoliticaPrivacidad from "./Publico/InformacionEmpresa/PoliticaPrivacidad";
 
+import ErrorPage from "./Publico/Error/ErrorPage";
+
 //RUTAS DEL CLIENTE 
 import ClientLayout from "./components/layout/ClientLayout";
 
@@ -80,14 +82,27 @@ import InformacionCliente from "./Cliente/Perfil/InformacionCliente";
 import NotificacionesCliente from "./Cliente/Perfil/NotificacionesCliente";
 
 
-function NotFound() {
-  return (
-    <div className="max-w-7xl mx-auto px-4 py-16">
-      <h1 className="text-3xl font-bold text-pink-700">404</h1>
-      <p className="text-pink-800 mt-2">Página no encontrada.</p>
-    </div>
-  );
-}
+
+
+// Admin
+import AdminLayout from "./components/layout/AdminLayout";
+import DashboardAdmin from "./Administrador/DashboardAdmin";
+import GestionServicios from "./Administrador/Servicios/GestionServicios";
+import PromocionesAdmin from "./Administrador/Servicios/Promociones";
+import CatalogoProductosAdmin from "./Administrador/Productos/CatalogoProductosAdmin";
+import CategoriasProductos from "./Administrador/Productos/CategoriasProductos";
+import MarcasProductos from "./Administrador/Productos/MarcasProductos";
+import RegistrarVenta from "./Administrador/Ventas/RegistrarVenta";
+import HistorialVentas from "./Administrador/Ventas/HistorialVentas";
+import GestionPersonal from "./Administrador/Personal/GestionPersonal";
+import GenerarReportes from "./Administrador/Reportes/GenerarReportes";
+import InformesEstadisticos from "./Administrador/Reportes/InformesEstadisticos";
+import InformacionEmpresa from "./Administrador/Empresa/InformacionEmpresa";
+import ControlStock from "./Administrador/Inventario/ControlStock";
+import CategoriasServicios from "./Administrador/Servicios/CategoriasServicios";
+import GestionCarrusel from "./Administrador/Marketing/GestionCarrusel";
+import InicioSesionAdmin from "./Administrador/Login/InicioSesionAdmin";
+import GestionRespaldos from "./Administrador/Respaldos/GestionRespaldos";
 
 export default function App() {
   return (
@@ -111,10 +126,16 @@ export default function App() {
         <Route path="/redes-sociales" element={<RedesSociales />} />
         <Route path="/politica-privacidad" element={<PoliticaPrivacidad />} />
 
-        <Route path="*" element={<NotFound />} />
+        {/* Páginas de Error para pruebas */}
+        <Route path="/400" element={<ErrorPage code="400" title="Solicitud Incorrecta" message="Hubo un problema con la solicitud. Por favor verifica los datos." />} />
+        <Route path="/404" element={<ErrorPage code="404" title="Página no encontrada" message="Lo sentimos, la ruta que buscas no existe." />} />
+        <Route path="/500" element={<ErrorPage code="500" title="Error Interno" message="Algo salió mal en nuestro servidor. Intenta de nuevo más tarde." />} />
+
+        <Route path="*" element={<ErrorPage code="404" />} />
+      </Route>
 
       <Route path="/cliente" element={<ClientLayout />}>
-       <Route index element={<DashboardCliente />} />
+        <Route index element={<DashboardCliente />} />
 
         <Route path="productos" element={<CatalogoProductos />} />
         <Route path="productos/:id" element={<DetalleProductoCliente />} />
@@ -138,15 +159,34 @@ export default function App() {
         <Route path="perfil" element={<PerfilCliente />} />
         <Route path="perfil/info" element={<InformacionCliente />} />
         <Route path="perfil/notificaciones" element={<NotificacionesCliente />} />
-      
-        </Route>
+      </Route>
+
+      <Route path="/admin/login" element={<InicioSesionAdmin />} />
+
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<DashboardAdmin />} />
+        <Route path="servicios" element={<GestionServicios />} />
+        <Route path="servicios/categorias" element={<CategoriasServicios />} />
+        <Route path="promociones" element={<PromocionesAdmin />} />
+        <Route path="productos" element={<CatalogoProductosAdmin />} />
+        <Route path="productos/categorias" element={<CategoriasProductos />} />
+        <Route path="productos/marcas" element={<MarcasProductos />} />
+        <Route path="ventas" element={<HistorialVentas />} />
+        <Route path="ventas/nueva" element={<RegistrarVenta />} />
+        <Route path="personal" element={<GestionPersonal />} />
+        <Route path="reportes/generar" element={<GenerarReportes />} />
+        <Route path="reportes/estadisticas" element={<InformesEstadisticos />} />
+        <Route path="empresa" element={<InformacionEmpresa />} />
+        <Route path="carrusel" element={<GestionCarrusel />} />
+        <Route path="marketing/carrusel" element={<GestionCarrusel />} />
+        <Route path="inventario" element={<ControlStock />} />
+        <Route path="respaldos" element={<GestionRespaldos />} />
       </Route>
     </Routes>
-    
+
   );
 
 
 
-  
-}
 
+}

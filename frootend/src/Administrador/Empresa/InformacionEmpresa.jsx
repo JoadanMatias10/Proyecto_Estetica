@@ -477,7 +477,7 @@ export default function InformacionEmpresa() {
             <h3 className="text-lg font-bold text-slate-800">Horarios</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="form-label">Horario Lunes a Sabado</label>
+                <label className="form-label">Horario Lunes a Viernes</label>
                 <input
                   name="horarioLunesSabado"
                   value={draft.horarioLunesSabado || ""}
@@ -488,7 +488,7 @@ export default function InformacionEmpresa() {
                 />
               </div>
               <div>
-                <label className="form-label">Horario Domingo</label>
+                <label className="form-label">Horario Sabado</label>
                 <input
                   name="horarioDomingo"
                   value={draft.horarioDomingo || ""}
