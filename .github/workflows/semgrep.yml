@@ -1,4 +1,4 @@
-name: SAST Scan
+name: Escaneo SAST
 
 on:
   push:
@@ -7,14 +7,17 @@ on:
 
 jobs:
   semgrep:
+    name: Analisis SAST con Semgrep
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Descargar repositorio
         uses: actions/checkout@v3
 
-      - name: Install Semgrep
-        run: pip install semgrep
+      - name: Instalar Semgrep
+        run: |
+          python3 -m pip install semgrep
 
-      - name: Run Semgrep scan
-        run: semgrep --config auto .
+      - name: Ejecutar analisis de seguridad
+        run: |
+          semgrep --config p/owasp-top-ten --config p/javascript --config p/nodejs .
