@@ -3,7 +3,6 @@ name: Escaneo SAST
 on:
   push:
     branches: [ main ]
-  pull_request:
 
 jobs:
   semgrep:
@@ -11,17 +10,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout del codigo
+      - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Instalar Semgrep
         run: pip install semgrep
 
-      - name: Ejecutar analisis de seguridad
+      - name: Ejecutar escaneo SAST
         run: |
-          semgrep --config p/owasp-top-ten \
-                  --config p/javascript \
-                  --config p/nodejs \
-                  --config p/secrets \
-                  --config p/expressjs \
-                  .
+          semgrep scan \
+          --config p/owasp-top-ten \
+          --config p/javascript \
+          --config p/nodejs \
+          --config p/expressjs \
+          --config p/secrets \
+          --verbose .
