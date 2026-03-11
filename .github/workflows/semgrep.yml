@@ -11,13 +11,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Descargar repositorio
+      - name: Checkout del codigo
         uses: actions/checkout@v3
 
       - name: Instalar Semgrep
-        run: |
-          python3 -m pip install semgrep
+        run: pip install semgrep
 
       - name: Ejecutar analisis de seguridad
         run: |
-          semgrep --config p/owasp-top-ten --config p/javascript --config p/nodejs .
+          semgrep --config p/owasp-top-ten \
+                  --config p/javascript \
+                  --config p/nodejs \
+                  --config p/secrets \
+                  --config p/expressjs \
+                  .
