@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
@@ -70,6 +70,7 @@ const getDefaultFormValues = (product, categories, brands) => {
 };
 
 export default function CatalogoProductosAdmin() {
+  const fileInputRef = useRef(null);
   const [productos, setProductos] = useState([]);
   const [categoryRecords, setCategoryRecords] = useState([]);
   const [brandRecords, setBrandRecords] = useState([]);
@@ -77,6 +78,9 @@ export default function CatalogoProductosAdmin() {
   const [submitting, setSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState(null);
+  const [importSummary, setImportSummary] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const categories = useMemo(() => getCategoryNames(categoryRecords), [categoryRecords]);
   const brands = useMemo(() => brandRecords.map((brand) => brand.nombre), [brandRecords]);
   const [formValues, setFormValues] = useState(() =>
@@ -196,6 +200,79 @@ export default function CatalogoProductosAdmin() {
     setFormValues((prev) => ({ ...prev, imagen: "", imagenNombre: "" }));
   };
 
+  const handleExportProducts = async () => {
+    if (exporting) return;
+    setExporting(true);
+
+    try {
+      const response = await fetch(endpoints.adminProductsExport, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${getAdminToken()}`,
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(Array.isArray(data.errors) && data.errors.length
+          ? data.errors[0]
+          : data.error || data.message || "No fue posible exportar productos.");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `productos-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      window.alert(error.message || "No fue posible exportar productos.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImportProducts = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    setImportSummary(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("archivo", file);
+
+      const response = await fetch(endpoints.adminProductsImport, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${getAdminToken()}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(Array.isArray(data.errors) && data.errors.length
+          ? data.errors[0]
+          : data.error || data.message || "No fue posible importar productos.");
+      }
+
+      setImportSummary(data);
+      if (data?.created || data?.updated || data?.skipped) {
+        await loadData();
+      }
+    } catch (error) {
+      window.alert(error.message || "No fue posible importar productos.");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setImporting(false);
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -265,16 +342,69 @@ export default function CatalogoProductosAdmin() {
           <h1 className="text-2xl font-bold text-slate-800">Catalogo de Productos</h1>
           <p className="text-slate-500 text-sm">Usa categorias y marcas creadas por administrador.</p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => openModal()}
-          aria-label="Nuevo Producto"
-          title="Nuevo Producto"
-          className="w-10 h-10 p-0 rounded-full text-black border-2 border-slate-300 bg-white hover:bg-slate-50"
-        >
-          +
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleExportProducts}
+            aria-label="Exportar productos a excel"
+            title="Exportar productos a excel"
+            className="px-3 h-10 rounded-xl text-black border-2 border-slate-300 bg-white hover:bg-slate-50"
+            disabled={exporting}
+          >
+            {exporting ? "Exportando..." : "Exportar Excel"}
+          </Button>
+          <label
+            htmlFor="productos-excel-import"
+            className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium text-black border-2 border-slate-300 bg-white hover:bg-slate-50 cursor-pointer ${importing ? "opacity-60 pointer-events-none" : ""}`}
+          >
+            {importing ? "Importando..." : "Importar Excel"}
+          </label>
+          <input
+            id="productos-excel-import"
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleImportProducts}
+            className="sr-only"
+          />
+          <Button
+            variant="outline"
+            onClick={() => openModal()}
+            aria-label="Nuevo Producto"
+            title="Nuevo Producto"
+            className="w-10 h-10 p-0 rounded-full text-black border-2 border-slate-300 bg-white hover:bg-slate-50"
+          >
+            +
+          </Button>
+        </div>
       </div>
+
+      {importSummary ? (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 space-y-2">
+          <h2 className="font-semibold text-slate-800 text-sm">Resultado de importación</h2>
+          <div className="text-sm text-slate-600 grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <p>Filas: {importSummary.totalRows || 0}</p>
+            <p>Creados: {importSummary.created || 0}</p>
+            <p>Actualizados: {importSummary.updated || 0}</p>
+            <p>Omitidos: {importSummary.skipped || 0}</p>
+          </div>
+          {Array.isArray(importSummary.errors) && importSummary.errors.length > 0 && (
+            <div className="text-sm text-red-600">
+              <p className="font-semibold">Errores:</p>
+              <ul className="list-disc list-inside space-y-1">
+                {importSummary.errors.slice(0, 8).map((item, index) => (
+                  <li key={`${item}-${index}`}>{item}</li>
+                ))}
+              </ul>
+              {importSummary.errors.length > 8 && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Y {importSummary.errors.length - 8} errores mas.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      ) : null}
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         {loading ? (

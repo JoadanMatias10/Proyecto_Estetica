@@ -29,6 +29,8 @@ export const endpoints = {
   publicCarousel: buildUrl("/public/carousel"),
 
   adminProducts: buildUrl("/admin/products"),
+  adminProductsExport: buildUrl("/admin/products/export"),
+  adminProductsImport: buildUrl("/admin/products/import"),
   adminProductById: (id) => buildUrl(`/admin/products/${id}`),
   adminProductCategories: buildUrl("/admin/product-categories"),
   adminProductCategoryById: (id) => buildUrl(`/admin/product-categories/${id}`),
@@ -58,6 +60,8 @@ export const endpoints = {
   adminBackupCollections: buildUrl("/admin/respaldos/colecciones"),
   adminBackupHistory: buildUrl("/admin/respaldos/historial"),
   adminBackupCreate: buildUrl("/admin/respaldos/crear"),
+  adminBackupSchedule: buildUrl("/admin/respaldos/programacion"),
+  adminBackupDownload: (id) => buildUrl(`/admin/respaldos/descargar/${encodeURIComponent(id || "")}`),
 };
 
 export async function requestJson(url, options = {}) {

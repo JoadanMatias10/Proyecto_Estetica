@@ -1,4 +1,4 @@
-function registrarAuthAdminRoutes(router, contexto) {
+                                                  function registrarAuthAdminRoutes(router, contexto) {
   const {
     normalizeString,
     getKey,

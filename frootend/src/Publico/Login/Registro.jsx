@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Button from "../../components/ui/Button";
-import { endpoints } from "../../api";
+import { endpoints, requestJson } from "../../api";
 import SidebarIcon from "../../components/ui/SidebarIcon";
 
 export default function Registro() {
@@ -51,21 +51,14 @@ export default function Registro() {
     if (validate()) {
       setLoading(true);
       try {
-        const response = await fetch(endpoints.register, {
+        await requestJson(endpoints.register, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: formData,
         });
-        const data = await response.json();
-
-        if (response.ok) {
-          alert("Registro exitoso. Por favor inicia sesion.");
-          navigate("/login");
-        } else {
-          setServerError(data.errors ? data.errors[0] : "Error al registrarse");
-        }
+        alert("Registro exitoso. Por favor inicia sesion.");
+        navigate("/login");
       } catch (error) {
-        setServerError("Error de conexion con el servidor");
+        setServerError(error.message || "Error al registrarse");
       } finally {
         setLoading(false);
       }

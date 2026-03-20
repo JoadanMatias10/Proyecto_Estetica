@@ -28,6 +28,7 @@ const registrarRespaldosAdminRoutes = require("./administrador/respaldosAdmin");
 const registrarInventarioAdminRoutes = require("./administrador/inventarioAdmin");
 const registrarStaffAdminRoutes = require("./administrador/staffAdmin");
 const registrarCatalogoAdminRoutes = require("./administrador/catalogoAdmin");
+const upload = require("../middleware/multer");
 
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 10 * 60 * 1000;
@@ -297,6 +298,25 @@ function getEndOfDay(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
 }
 
+// Construye un rango de fecha de forma segura para Mongo: solo fechas válidas.
+function buildDateRangeFilter(fromDate, toDate) {
+  const safeFrom = fromDate instanceof Date && !Number.isNaN(fromDate.getTime()) ? fromDate : null;
+  const safeTo = toDate instanceof Date && !Number.isNaN(toDate.getTime()) ? toDate : null;
+
+  if (!safeFrom && !safeTo) return {};
+
+  const dateRange = {};
+  if (safeFrom) dateRange.$gte = safeFrom;
+  if (safeTo) dateRange.$lte = safeTo;
+  return dateRange;
+}
+
+function buildFieldDateQuery(field, fromDate, toDate) {
+  const dateRange = buildDateRangeFilter(fromDate, toDate);
+  if (!Object.keys(dateRange).length) return {};
+  return { [field]: dateRange };
+}
+
 function buildBuckets(period, now) {
   if (period === "Semana") {
     const labels = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
@@ -380,8 +400,6 @@ function guardarResumenEnHistorial(resumen) {
   }
 }
 
-
-
 registrarAuthAdminRoutes(router, {
   normalizeString,
   getKey,
@@ -452,6 +470,7 @@ registrarCatalogoAdminRoutes(router, {
   estimateBase64Bytes,
   ALLOWED_POLICY_DOCUMENT_TYPES,
   MAX_POLICY_DOCUMENT_BYTES,
+  upload,
 });
 
 
@@ -460,12 +479,14 @@ router.get("/stats", async (req, res) => {
   const now = new Date();
   const startDate = addDays(now, -(config.days - 1));
   const buckets = buildBuckets(config.period, now);
-
+  // Filtro reutilizable ya sanitizado para fecha de creación.
+  const createdAtFilter = buildFieldDateQuery("createdAt", startDate);
+  
   const [products, services, appointments, newClients] = await Promise.all([
-    Product.find({ createdAt: { $gte: startDate } }).select("precio createdAt").lean(),
-    Service.find({ createdAt: { $gte: startDate } }).select("precio createdAt").lean(),
-    Appointment.find({ createdAt: { $gte: startDate } }).select("createdAt").lean(),
-    User.find({ role: "client", createdAt: { $gte: startDate } }).select("createdAt").lean(),
+    Product.find({ ...createdAtFilter }).select("precio createdAt").lean(),
+    Service.find({ ...createdAtFilter }).select("precio createdAt").lean(),
+    Appointment.find({ ...createdAtFilter }).select("createdAt").lean(),
+    User.find({ role: "client", ...createdAtFilter }).select("createdAt").lean(),
   ]);
 
   const totalProductos = products.reduce((sum, product) => sum + Number(product.precio || 0), 0);
@@ -576,27 +597,23 @@ router.get("/reports", async (req, res) => {
     return res.status(400).json({ errors: ["La fecha inicio no puede ser mayor que la fecha fin."] });
   }
 
-  const productDateQuery = {};
-  if (desde) productDateQuery.$gte = desde;
-  if (hasta) productDateQuery.$lte = hasta;
-
-  const appointmentDateQuery = {};
-  if (desde) appointmentDateQuery.$gte = desde;
-  if (hasta) appointmentDateQuery.$lte = hasta;
+  const productFilter = buildFieldDateQuery("createdAt", desde, hasta);
+  // Filtro de fecha para citas por fechaHora, construido con mismo patrón seguro.
+  const appointmentFilter = buildFieldDateQuery("fechaHora", desde, hasta);
 
   const shouldIncludeProducts = tipo === "Todos" || tipo === "Venta";
   const shouldIncludeServices = tipo === "Todos" || tipo === "Servicio";
 
   const [products, appointments, services] = await Promise.all([
     shouldIncludeProducts
-      ? Product.find(Object.keys(productDateQuery).length ? { createdAt: productDateQuery } : {})
-          .select("nombre precio createdAt")
-          .lean()
+      ? Product.find(productFilter)
+           .select("nombre precio createdAt")
+           .lean()
       : Promise.resolve([]),
     shouldIncludeServices
-      ? Appointment.find(Object.keys(appointmentDateQuery).length ? { fechaHora: appointmentDateQuery } : {})
-          .select("servicio fechaHora userId")
-          .lean()
+      ? Appointment.find(appointmentFilter)
+           .select("servicio fechaHora userId")
+           .lean()
       : Promise.resolve([]),
     shouldIncludeServices
       ? Service.find().select("nombre precio").lean()
@@ -607,16 +624,22 @@ router.get("/reports", async (req, res) => {
   if (shouldIncludeServices && appointments.length > 0) {
     const userIds = Array.from(new Set(appointments.map((appointment) => String(appointment.userId)).filter(Boolean)));
     if (userIds.length > 0) {
-      const users = await User.find({ _id: { $in: userIds } }).select("nombre apellidoPaterno apellidoMaterno").lean();
-      userMap = new Map(
-        users.map((user) => {
-          const fullName = [user.nombre, user.apellidoPaterno, user.apellidoMaterno]
-            .map((part) => normalizeString(part))
-            .filter(Boolean)
-            .join(" ");
-          return [String(user._id), fullName || "Cliente"];
-        })
-      );
+      // Previene inyección/errores por IDs inválidos antes de usar $in.
+      const safeUserIds = userIds.filter((userId) => isValidId(userId)).map((userId) => new mongoose.Types.ObjectId(userId));
+      if (!safeUserIds.length) {
+        userMap = new Map();
+      } else {
+        const users = await User.find({ _id: { $in: safeUserIds } }).select("nombre apellidoPaterno apellidoMaterno").lean();
+        userMap = new Map(
+          users.map((user) => {
+            const fullName = [user.nombre, user.apellidoPaterno, user.apellidoMaterno]
+              .map((part) => normalizeString(part))
+              .filter(Boolean)
+              .join(" ");
+            return [String(user._id), fullName || "Cliente"];
+          })
+        );
+      }
     }
   }
 
@@ -700,11 +723,8 @@ router.get("/sales", async (req, res) => {
     return res.status(400).json({ errors: ["La fecha inicio no puede ser mayor que la fecha fin."] });
   }
 
-  const dateQuery = {};
-  if (desde) dateQuery.$gte = desde;
-  if (hasta) dateQuery.$lte = hasta;
-
-  const query = Object.keys(dateQuery).length ? { createdAt: dateQuery } : {};
+  // Se arma el query con helper seguro para evitar variantes inválidas en filtros de fecha.
+  const query = buildFieldDateQuery("createdAt", desde, hasta);
   const sales = await Sale.find(query).sort({ createdAt: -1 }).lean();
   const mappedSales = sales.map(mapSale);
 

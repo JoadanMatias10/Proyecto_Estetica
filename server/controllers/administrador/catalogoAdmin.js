@@ -1,3 +1,21 @@
+const multer = require("multer");
+
+let xlsxCache = null;
+let xlsxLoadError = null;
+
+function getXlsx() {
+  if (xlsxCache) return xlsxCache;
+  if (xlsxLoadError) throw xlsxLoadError;
+
+  try {
+    xlsxCache = require("xlsx");
+    return xlsxCache;
+  } catch (error) {
+    xlsxLoadError = error;
+    throw error;
+  }
+}
+
 function registrarCatalogoAdminRoutes(router, contexto) {
   const {
     ProductCategory,
@@ -23,7 +41,68 @@ function registrarCatalogoAdminRoutes(router, contexto) {
     estimateBase64Bytes,
     ALLOWED_POLICY_DOCUMENT_TYPES,
     MAX_POLICY_DOCUMENT_BYTES,
+    upload,
   } = contexto;
+
+const EXCEL_PRODUCT_COLUMNS = [
+  "producto",
+  "imagen",
+  "marca",
+  "categoria",
+  "precio",
+  "stock",
+  "acciones",
+];
+
+const excelUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+
+function normalizeImportHeader(value) {
+  return sanitizeText(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function normalizeImportText(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number") return String(value);
+  return sanitizeText(String(value));
+}
+
+function normalizeImportNumber(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const normalized = normalizeImportText(value).replace(/\s+/g, "").replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+function normalizeCatalogLookup(value) {
+  return normalizeImportText(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function pickImportValue(row, keys) {
+  const normalizedRow = {};
+
+  Object.entries(row || {}).forEach(([key, value]) => {
+    normalizedRow[normalizeImportHeader(key)] = value;
+  });
+
+  for (const key of keys) {
+    const normalizedKey = normalizeImportHeader(key);
+    if (Object.prototype.hasOwnProperty.call(normalizedRow, normalizedKey)) {
+      return normalizedRow[normalizedKey];
+    }
+  }
+
+  return "";
+}
 
 router.get("/product-categories", async (_req, res) => {
   const categories = await ProductCategory.find().sort({ nombre: 1 }).lean();
@@ -194,13 +273,171 @@ router.get("/products", async (_req, res) => {
   return res.json({ products: products.map(mapId) });
 });
 
-router.post("/products", async (req, res) => {
+router.get("/products/export", async (_req, res) => {
+  let xlsx;
+  try {
+    xlsx = getXlsx();
+  } catch (_error) {
+    return res.status(503).json({
+      errors: ["La exportacion de productos no esta disponible. Instala la dependencia xlsx en el servidor."],
+    });
+  }
+
+  const products = await Product.find().sort({ createdAt: -1 }).lean();
+  const rows = products.map((product) => ({
+    producto: product.nombre || "",
+    imagen: product.imagen || "",
+    marca: product.marca || "",
+    categoria: product.categoria || "",
+    precio: Number(product.precio || 0),
+    stock: Number(product.stock || 0),
+    acciones: "",
+  }));
+
+  const worksheet = xlsx.utils.json_to_sheet(rows, { header: EXCEL_PRODUCT_COLUMNS });
+  const workbook = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(workbook, worksheet, "Productos");
+  const buffer = xlsx.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+  const fileName = `productos-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  res.setHeader("Content-Disposition", `attachment; filename=\"${fileName}\"`);
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  return res.send(buffer);
+});
+
+router.post("/products/import", excelUpload.single("archivo"), async (req, res) => {
+  let xlsx;
+  try {
+    xlsx = getXlsx();
+  } catch (_error) {
+    return res.status(503).json({
+      errors: ["La importacion de productos no esta disponible. Instala la dependencia xlsx en el servidor."],
+    });
+  }
+
+  const archivo = req.file;
+  if (!archivo) {
+    return res.status(400).json({ errors: ["Debes seleccionar un archivo Excel."] });
+  }
+
+  const archivoNombre = sanitizeText(archivo.originalname || "").toLowerCase();
+  if (!archivoNombre.endsWith(".xlsx") && !archivoNombre.endsWith(".xls")) {
+    return res.status(400).json({ errors: ["Formato invalido. Subir archivo .xlsx o .xls."] });
+  }
+
+  let rows;
+  try {
+    const workbook = xlsx.read(archivo.buffer, { type: "buffer" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!sheet) {
+      return res.status(400).json({ errors: ["El archivo no contiene hojas validas."] });
+    }
+    rows = xlsx.utils.sheet_to_json(sheet, { defval: "", raw: false });
+  } catch (_error) {
+    return res.status(400).json({ errors: ["No fue posible leer el archivo Excel."] });
+  }
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ errors: ["El archivo esta vacio."] });
+  }
+
+  try {
+    const categoryNames = await ProductCategory.find().select("nombre").lean();
+    const brandNames = await ProductBrand.find().select("nombre").lean();
+    const categoryMap = new Map(
+      categoryNames.map((item) => [normalizeCatalogLookup(item.nombre), sanitizeText(item.nombre)])
+    );
+    const brandMap = new Map(
+      brandNames.map((item) => [normalizeCatalogLookup(item.nombre), sanitizeText(item.nombre)])
+    );
+
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+    const errors = [];
+    const processedKeys = new Set();
+
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index] || {};
+      const line = index + 2;
+      const rowErrors = [];
+
+      const nombre = normalizeImportText(pickImportValue(row, ["producto", "nombre", "name", "product name"]));
+      const marcaRaw = normalizeImportText(pickImportValue(row, ["marca", "brand", "marca producto"]));
+      const categoriaRaw = normalizeImportText(pickImportValue(row, ["categoria", "category", "categoria producto"]));
+      const imagen = normalizeImportText(pickImportValue(row, ["imagen", "image"]));
+      const precio = normalizeImportNumber(pickImportValue(row, ["precio", "price"]));
+      const stock = normalizeImportNumber(pickImportValue(row, ["stock", "existencias", "cantidad"]));
+      const marcaLookup = normalizeCatalogLookup(marcaRaw);
+      const categoriaLookup = normalizeCatalogLookup(categoriaRaw);
+      const marca = brandMap.get(marcaLookup) || marcaRaw;
+      const categoria = categoryMap.get(categoriaLookup) || categoriaRaw;
+
+      const importKey = `${nombre.toLowerCase()}-${marca.toLowerCase()}-${categoria.toLowerCase()}`;
+
+      if (!nombre) rowErrors.push("El nombre es obligatorio.");
+      if (!marca) rowErrors.push("La marca es obligatoria.");
+      if (!categoria) rowErrors.push("La categoria es obligatoria.");
+      if (!Number.isFinite(precio) || precio < 0) rowErrors.push("Precio invalido.");
+      if (!Number.isFinite(stock) || stock < 0) rowErrors.push("Stock invalido.");
+      if (!categoryMap.has(categoriaLookup)) rowErrors.push("La categoria no existe.");
+      if (!brandMap.has(marcaLookup)) rowErrors.push("La marca no existe.");
+      if (processedKeys.has(importKey)) rowErrors.push("Producto duplicado dentro del mismo archivo.");
+
+      if (rowErrors.length) {
+        errors.push(`Fila ${line}: ${rowErrors.join(" ")}`);
+        skipped += 1;
+        continue;
+      }
+
+      processedKeys.add(importKey);
+      const productData = {
+        nombre,
+        marca,
+        precio,
+        stock,
+        categoria,
+      };
+
+      if (imagen) {
+        productData.imagen = imagen;
+      }
+
+      const existingByName = await Product.findOne({ nombre, marca, categoria });
+      if (existingByName) {
+        Object.assign(existingByName, productData);
+        await existingByName.save();
+        updated += 1;
+        continue;
+      }
+
+      await Product.create(productData);
+      created += 1;
+    }
+
+    return res.json({
+      totalRows: rows.length,
+      processedRows: created + updated,
+      created,
+      updated,
+      skipped,
+      errors,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      errors: [error?.message || "No fue posible importar el archivo."],
+    });
+  }
+});
+
+router.post("/products", upload.single("imagen"), async (req, res) => {
+  const uploadedImage = req.file;
   const nombre = sanitizeText(req.body.nombre);
   const marca = sanitizeText(req.body.marca);
   const categoria = sanitizeText(req.body.categoria);
   const descripcion = sanitizeText(req.body.descripcion);
-  const imagen = sanitizeText(req.body.imagen);
-  const imagenNombre = sanitizeText(req.body.imagenNombre);
+  const imagen = sanitizeText(uploadedImage?.path || req.body.imagen);
+  const imagenNombre = sanitizeText(uploadedImage?.originalname || req.body.imagenNombre);
   const precio = parsePositiveNumber(req.body.precio, NaN);
   const stock = parsePositiveNumber(req.body.stock, NaN);
   const cantidadMedida = parsePositiveNumber(req.body.cantidadMedida, NaN);

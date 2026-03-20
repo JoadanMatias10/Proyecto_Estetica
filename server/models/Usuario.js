@@ -1,8 +1,14 @@
 const mongoose = require("mongoose");
 
+function normalizeOptionalUsername(value) {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized || undefined;
+}
+
 const userSchema = new mongoose.Schema(
   {
-    username: { type: String, unique: true, sparse: true, lowercase: true, trim: true },
+    username: { type: String, unique: true, sparse: true, default: undefined, set: normalizeOptionalUsername },
     nombre: { type: String, required: true, trim: true },
     apellidoPaterno: { type: String, required: true, trim: true },
     apellidoMaterno: { type: String, required: true, trim: true },
