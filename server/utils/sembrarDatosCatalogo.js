@@ -1,46 +1,55 @@
 const StaffMember = require("../models/MiembroPersonal");
 const User = require("../models/Usuario");
 const {
+  ACCOUNT_STATUS,
+  mapUserRoleToStaffRole,
+} = require("./accountAccess");
+const {
   DEFAULT_STAFF_MEMBERS,
 } = require("./datosCatalogoPredeterminado");
 
 async function ensureAdminStaffMembers() {
-  const adminUsers = await User.find({ role: "admin" })
-    .select("nombre username correo telefono")
+  const adminUsers = await User.find({ role: { $in: ["admin", "stylist"] } })
+    .select("nombre username correo telefono role accountStatus")
     .lean();
 
   for (const adminUser of adminUsers) {
     const email = (adminUser.correo || "").trim().toLowerCase();
     const telefono = (adminUser.telefono || "").trim();
     const nombre = (adminUser.nombre || adminUser.username || "Administrador").trim();
+    const rol = mapUserRoleToStaffRole(adminUser.role) || "Estilista";
+    const estado = adminUser.accountStatus === ACCOUNT_STATUS.INACTIVE ? "Inactivo" : "Activo";
     if (!email || !telefono) continue;
 
     const byEmail = await StaffMember.findOne({ email });
     if (byEmail) {
+      byEmail.userId = adminUser._id;
       byEmail.nombre = nombre;
-      byEmail.rol = "Administrador";
+      byEmail.rol = rol;
       byEmail.telefono = telefono;
-      byEmail.estado = "Activo";
+      byEmail.estado = estado;
       await byEmail.save();
       continue;
     }
 
     const byPhone = await StaffMember.findOne({ telefono });
     if (byPhone) {
+      byPhone.userId = adminUser._id;
       byPhone.nombre = nombre;
-      byPhone.rol = "Administrador";
+      byPhone.rol = rol;
       byPhone.email = email;
-      byPhone.estado = "Activo";
+      byPhone.estado = estado;
       await byPhone.save();
       continue;
     }
 
     await StaffMember.create({
+      userId: adminUser._id,
       nombre,
-      rol: "Administrador",
+      rol,
       email,
       telefono,
-      estado: "Activo",
+      estado,
     });
   }
 }

@@ -37,7 +37,7 @@ export default function AdminHeader() {
             <div className="font-bold bg-gradient-to-r from-violet-600 to-rose-500 bg-clip-text text-transparent">
               Estetica Panamericana
             </div>
-            <div className="text-xs text-violet-600 font-medium">Panel administrador</div>
+            <div className="text-xs text-violet-600 font-medium">Panel interno</div>
           </div>
         </div>
 

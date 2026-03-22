@@ -8,6 +8,8 @@ const routeNameMap = {
   login: "Iniciar Sesion",
   registro: "Registro",
   recuperar: "Recuperar Contrasena",
+  "activar-cuenta": "Activar Cuenta",
+  "restablecer-contrasena": "Restablecer Contrasena",
   servicios: "Nuestros Servicios",
   contactos: "Contactanos",
   "quienes-somos": "Quienes Somos",

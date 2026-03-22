@@ -22,7 +22,7 @@ export default function AdminLayout() {
 
       try {
         const parsed = JSON.parse(rawAdminUser);
-        if (!parsed || parsed.role !== "admin") {
+        if (!parsed || !["admin", "stylist"].includes(parsed.role)) {
           navigate("/login", { replace: true });
           return;
         }
@@ -63,7 +63,7 @@ export default function AdminLayout() {
   }, [navigate]);
 
   if (checkingAuth) {
-    return <LoadingSpinner text="Validando acceso administrador..." />;
+    return <LoadingSpinner text="Validando acceso interno..." />;
   }
 
   return (

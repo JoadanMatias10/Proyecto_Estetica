@@ -41,6 +41,7 @@ import Promociones from "./Publico/ProductosAvyna/Promociones";
 import InicioSesion from "./Publico/Login/InicioSesion";
 import Registro from "./Publico/Login/Registro";
 import Recuperacion from "./Publico/Login/Recuperacion";
+import ConfigurarAccesoCuenta from "./Publico/Login/ConfigurarAccesoCuenta";
 
 // Servicios
 import ConsultaServicio from "./Publico/Servicios/ConsultaServicio";
@@ -116,6 +117,8 @@ export default function App() {
         <Route path="/login" element={<InicioSesion />} />
         <Route path="/registro" element={<Registro />} />
         <Route path="/recuperar" element={<Recuperacion />} />
+        <Route path="/activar-cuenta" element={<ConfigurarAccesoCuenta mode="invite" />} />
+        <Route path="/restablecer-contrasena" element={<ConfigurarAccesoCuenta mode="reset" />} />
 
         <Route path="/servicios" element={<ConsultaServicio />} />
 

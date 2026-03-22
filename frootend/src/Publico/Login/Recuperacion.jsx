@@ -1,44 +1,43 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import Button from "../../components/ui/Button";
-import { endpoints } from "../../api";
+import { endpoints, requestJson } from "../../api";
 
 export default function Recuperacion() {
   const [correo, setCorreo] = useState("");
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setServerError("");
-    setSuccess(false);
+    setSuccessMessage("");
+
     if (!correo) {
       setError("El correo es obligatorio");
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
-      setError("Formato de correo inválido");
-    } else {
-      setError(null);
-      setLoading(true);
-      try {
-        const response = await fetch(endpoints.recover, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ correo }),
-        });
-        const data = await response.json();
-        if (response.ok) {
-          setSuccess(true);
-          setCorreo("");
-        } else {
-          setServerError(data.errors ? data.errors[0] : "Error al enviar solicitud");
-        }
-      } catch (error) {
-        setServerError("Error de conexión con el servidor");
-      } finally {
-        setLoading(false);
-      }
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+      setError("Formato de correo invalido");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+    try {
+      const data = await requestJson(endpoints.recover, {
+        method: "POST",
+        body: { correo },
+      });
+      setSuccessMessage(data.message || "Enlace enviado. Revisa tu bandeja de entrada.");
+      setCorreo("");
+    } catch (requestError) {
+      setServerError(requestError.message || "Error al enviar solicitud");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -49,7 +48,7 @@ export default function Recuperacion() {
   return (
     <div className="max-w-md mx-auto px-4 py-12">
       <div className="card rounded-3xl p-8 shadow-xl">
-        <h1 className="page-title">Recuperación de contraseña</h1>
+        <h1 className="page-title">Recuperacion de contrasena</h1>
         <p className="page-subtitle mt-2">Te enviaremos un enlace al correo.</p>
 
         {serverError && (
@@ -58,9 +57,9 @@ export default function Recuperacion() {
           </div>
         )}
 
-        {success && (
+        {successMessage && (
           <div className="bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl p-3 mb-4 text-sm font-medium">
-            ¡Enlace enviado! Revisa tu bandeja de entrada.
+            {successMessage}
           </div>
         )}
 
@@ -69,7 +68,10 @@ export default function Recuperacion() {
             <label className="form-label">Correo</label>
             <input
               value={correo}
-              onChange={(e) => { setCorreo(e.target.value); setError(null); }}
+              onChange={(event) => {
+                setCorreo(event.target.value);
+                setError("");
+              }}
               className={inputClass}
             />
             {error && <p className="text-xs text-red-500 mt-1 font-medium">{error}</p>}
@@ -81,7 +83,7 @@ export default function Recuperacion() {
 
           <p className="text-sm text-slate-500 mt-3">
             <Link className="text-violet-600 hover:text-violet-700 font-semibold transition-colors" to="/login">
-              Volver a iniciar sesión
+              Volver a iniciar sesion
             </Link>
           </p>
         </form>

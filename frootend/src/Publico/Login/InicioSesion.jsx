@@ -40,7 +40,7 @@ export default function InicioSesion() {
           localStorage.setItem("token", data.token);
           localStorage.setItem("user", JSON.stringify(data.user));
 
-          if (data.user?.role === "admin") {
+          if (data.user?.role === "admin" || data.user?.role === "stylist") {
             localStorage.setItem("adminToken", data.token);
             localStorage.setItem("adminUser", JSON.stringify(data.user));
             navigate("/admin");

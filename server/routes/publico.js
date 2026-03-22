@@ -1,6 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const User = require("../models/Usuario");
+const AccountAccessToken = require("../models/TokenAccesoCuenta");
 const ProductCategory = require("../models/CategoriaProducto");
 const ProductBrand = require("../models/MarcaProducto");
 const Product = require("../models/Producto");
@@ -10,6 +11,16 @@ const CompanyInfo = require("../models/InformacionEmpresa");
 const CarouselSlide = require("../models/DiapositivaCarrusel");
 const { hashPassword, verifyPassword } = require("../utils/contrasena");
 const { createToken } = require("../utils/auth");
+const {
+  ACCOUNT_STATUS,
+  INVITE_EXPIRATION_MS,
+  PASSWORD_RESET_EXPIRATION_MS,
+  getValidAccessToken,
+  isInternalUserRole,
+  issueAccessToken,
+  sendInviteEmail,
+  sendPasswordResetEmail,
+} = require("../utils/accountAccess");
 const {
   normalizeString,
   validateName,
@@ -64,6 +75,40 @@ function normalizeEmail(value) {
   return normalizeString(value).toLowerCase();
 }
 
+function buildUserResponse(user) {
+  return {
+    id: String(user._id),
+    nombre: user.nombre,
+    apellidoPaterno: user.apellidoPaterno,
+    apellidoMaterno: user.apellidoMaterno,
+    telefono: user.telefono,
+    correo: user.correo,
+    role: user.role,
+    accountStatus: user.accountStatus || ACCOUNT_STATUS.ACTIVE,
+  };
+}
+
+function buildBlockedLoginMessage(user) {
+  if (!user) return "Credenciales invalidas.";
+  if (user.accountStatus === ACCOUNT_STATUS.PENDING) {
+    return "Tu cuenta aun no esta activada. Revisa el enlace enviado a tu correo.";
+  }
+  if (user.accountStatus === ACCOUNT_STATUS.INACTIVE) {
+    return "Tu cuenta esta inactiva. Contacta al administrador.";
+  }
+  return "";
+}
+
+async function resolveTokenUser(token, type) {
+  const record = await getValidAccessToken(AccountAccessToken, { token, type });
+  if (!record) return { record: null, user: null };
+
+  const user = await User.findById(record.userId);
+  if (!user) return { record: null, user: null };
+
+  return { record, user };
+}
+
 router.post("/register", async (req, res) => {
   try {
     const errors = [];
@@ -112,15 +157,7 @@ router.post("/register", async (req, res) => {
     return res.status(201).json({
       message: "Registro exitoso.",
       token: createToken({ id: user._id, correo: user.correo, role: user.role }),
-      user: {
-        id: user._id,
-        nombre: user.nombre,
-        apellidoPaterno: user.apellidoPaterno,
-        apellidoMaterno: user.apellidoMaterno,
-        telefono: user.telefono,
-        correo: user.correo,
-        role: user.role,
-      },
+      user: buildUserResponse(user),
     });
   } catch (error) {
     if (error?.code === 11000) {
@@ -167,11 +204,90 @@ router.post("/login", async (req, res) => {
     return res.status(401).json({ errors: ["Credenciales invalidas."] });
   }
 
+  const blockedMessage = buildBlockedLoginMessage(user);
+  if (blockedMessage) {
+    return res.status(403).json({ errors: [blockedMessage] });
+  }
+
   return res.json({
     message: "Inicio de sesion correcto.",
     token: createToken({ id: user._id, correo: user.correo, role: user.role }),
+    user: buildUserResponse(user),
+  });
+});
+
+router.post("/recover", async (req, res) => {
+  try {
+    const errors = [];
+    const { correo } = req.body;
+    validateEmail(correo, errors);
+
+    if (errors.length) {
+      return res.status(400).json({ errors });
+    }
+
+    const normalizedRecoverEmail = normalizeEmail(correo);
+    const user = await User.findOne({ correo: { $eq: normalizedRecoverEmail } });
+    if (!user) {
+      return res.status(404).json({ errors: ["No existe una cuenta con ese correo."] });
+    }
+
+    if (user.accountStatus === ACCOUNT_STATUS.INACTIVE) {
+      return res.status(403).json({ errors: ["La cuenta esta inactiva. Contacta al administrador."] });
+    }
+
+    if (user.accountStatus === ACCOUNT_STATUS.PENDING && isInternalUserRole(user.role)) {
+      const { rawToken } = await issueAccessToken(AccountAccessToken, {
+        userId: user._id,
+        type: "invite",
+        expiresInMs: INVITE_EXPIRATION_MS,
+      });
+      await sendInviteEmail(user, rawToken);
+      user.inviteSentAt = new Date();
+      await user.save();
+
+      return res.json({
+        message: "Tu cuenta aun no esta activada. Se reenvio el enlace de activacion al correo.",
+      });
+    }
+
+    const { rawToken } = await issueAccessToken(AccountAccessToken, {
+      userId: user._id,
+      type: "password_reset",
+      expiresInMs: PASSWORD_RESET_EXPIRATION_MS,
+    });
+    await sendPasswordResetEmail(user, rawToken);
+    user.passwordResetSentAt = new Date();
+    await user.save();
+
+    return res.json({
+      message: "Se envio un enlace de recuperacion al correo.",
+    });
+  } catch (error) {
+    console.error("Error en /api/public/recover:", error);
+    return res.status(500).json({
+      errors: ["No fue posible enviar el correo de recuperacion."],
+    });
+  }
+});
+
+router.get("/invite/validate", async (req, res) => {
+  const token = normalizeString(req.query.token);
+  if (!token) {
+    return res.status(400).json({ errors: ["Token de invitacion invalido."] });
+  }
+
+  const { user } = await resolveTokenUser(token, "invite");
+  if (!user) {
+    return res.status(404).json({ errors: ["La invitacion no existe o ya vencio."] });
+  }
+
+  if (user.accountStatus === ACCOUNT_STATUS.INACTIVE) {
+    return res.status(403).json({ errors: ["La cuenta esta inactiva. Contacta al administrador."] });
+  }
+
+  return res.json({
     user: {
-      id: user._id,
       nombre: user.nombre,
       correo: user.correo,
       role: user.role,
@@ -179,25 +295,112 @@ router.post("/login", async (req, res) => {
   });
 });
 
-router.post("/recover", async (req, res) => {
-  const errors = [];
-  const { correo } = req.body;
-  validateEmail(correo, errors);
+router.post("/invite/accept", async (req, res) => {
+  try {
+    const token = normalizeString(req.body.token);
+    const password = req.body.password || "";
+    const errors = [];
 
-  if (errors.length) {
-    return res.status(400).json({ errors });
+    if (!token) errors.push("Token de invitacion invalido.");
+    validatePassword(password, errors);
+    if (errors.length) {
+      return res.status(400).json({ errors });
+    }
+
+    const { record, user } = await resolveTokenUser(token, "invite");
+    if (!record || !user) {
+      return res.status(404).json({ errors: ["La invitacion no existe o ya vencio."] });
+    }
+
+    if (user.accountStatus === ACCOUNT_STATUS.INACTIVE) {
+      return res.status(403).json({ errors: ["La cuenta esta inactiva. Contacta al administrador."] });
+    }
+
+    const { hash, salt } = hashPassword(password);
+    user.passwordHash = hash;
+    user.passwordSalt = salt;
+    user.passwordSetupRequired = false;
+    user.accountStatus = ACCOUNT_STATUS.ACTIVE;
+    user.activatedAt = new Date();
+    record.usedAt = new Date();
+    await user.save();
+    await record.save();
+
+    await AccountAccessToken.deleteMany({ userId: user._id, type: "password_reset" });
+
+    return res.json({
+      message: "Cuenta activada correctamente. Ya puedes iniciar sesion.",
+    });
+  } catch (error) {
+    console.error("Error en /api/public/invite/accept:", error);
+    return res.status(500).json({
+      errors: ["No fue posible activar la cuenta."],
+    });
+  }
+});
+
+router.get("/reset-password/validate", async (req, res) => {
+  const token = normalizeString(req.query.token);
+  if (!token) {
+    return res.status(400).json({ errors: ["Token de recuperacion invalido."] });
   }
 
-  // Recuperacion: email normalizado y usado en comparacion exacta.
-  const normalizedRecoverEmail = normalizeEmail(correo);
-  const user = await User.findOne({ correo: { $eq: normalizedRecoverEmail } });
+  const { user } = await resolveTokenUser(token, "password_reset");
   if (!user) {
-    return res.status(404).json({ errors: ["No existe una cuenta con ese correo."] });
+    return res.status(404).json({ errors: ["El enlace de recuperacion no existe o ya vencio."] });
+  }
+
+  if (user.accountStatus !== ACCOUNT_STATUS.ACTIVE) {
+    return res.status(403).json({ errors: ["La cuenta no esta disponible para restablecer contrasena."] });
   }
 
   return res.json({
-    message: "Se envio un enlace de recuperacion al correo.",
+    user: {
+      nombre: user.nombre,
+      correo: user.correo,
+      role: user.role,
+    },
   });
+});
+
+router.post("/reset-password", async (req, res) => {
+  try {
+    const token = normalizeString(req.body.token);
+    const password = req.body.password || "";
+    const errors = [];
+
+    if (!token) errors.push("Token de recuperacion invalido.");
+    validatePassword(password, errors);
+    if (errors.length) {
+      return res.status(400).json({ errors });
+    }
+
+    const { record, user } = await resolveTokenUser(token, "password_reset");
+    if (!record || !user) {
+      return res.status(404).json({ errors: ["El enlace de recuperacion no existe o ya vencio."] });
+    }
+
+    if (user.accountStatus !== ACCOUNT_STATUS.ACTIVE) {
+      return res.status(403).json({ errors: ["La cuenta no esta disponible para restablecer contrasena."] });
+    }
+
+    const { hash, salt } = hashPassword(password);
+    user.passwordHash = hash;
+    user.passwordSalt = salt;
+    user.passwordSetupRequired = false;
+    record.usedAt = new Date();
+    await user.save();
+    await record.save();
+
+    return res.json({
+      message: "Contrasena actualizada correctamente. Ya puedes iniciar sesion.",
+    });
+  } catch (error) {
+    console.error("Error en /api/public/reset-password:", error);
+    return res.status(500).json({
+      errors: ["No fue posible actualizar la contrasena."],
+    });
+  }
 });
 
 router.get("/company-info", async (_req, res) => {

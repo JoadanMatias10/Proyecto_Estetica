@@ -5,6 +5,7 @@
     getState,
     registerFailure,
     clearState,
+    canUseAdminPanel,
     User,
     verifyPassword,
     createToken,
@@ -30,7 +31,7 @@ router.post("/login", async (req, res) => {
   }
 
   const user = await User.findOne({
-    role: "admin",
+    role: { $in: ["admin", "stylist"] },
     $or: [{ username: usuario }, { correo: usuario }],
   });
 
@@ -43,6 +44,13 @@ router.post("/login", async (req, res) => {
   if (!isValid) {
     registerFailure(key);
     return res.status(401).json({ errors: ["Credenciales invalidas."] });
+  }
+
+  if (user.accountStatus === "pending") {
+    return res.status(403).json({ errors: ["Tu cuenta aun no esta activada. Revisa el enlace enviado a tu correo."] });
+  }
+  if (user.accountStatus === "inactive") {
+    return res.status(403).json({ errors: ["Tu cuenta esta inactiva. Contacta al administrador."] });
   }
 
   clearState(key);
@@ -67,13 +75,13 @@ router.get("/me", async (req, res) => {
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const payload = verifyToken(token);
-  if (!payload || payload.role !== "admin") {
+  if (!payload || !canUseAdminPanel(payload.role)) {
     return res.status(401).json({ errors: ["No autorizado."] });
   }
 
-  const user = await User.findOne({ _id: payload.id, role: "admin" });
+  const user = await User.findOne({ _id: payload.id, role: { $in: ["admin", "stylist"] } });
   if (!user) {
-    return res.status(404).json({ errors: ["Administrador no encontrado."] });
+    return res.status(404).json({ errors: ["Usuario interno no encontrado."] });
   }
 
   return res.json({

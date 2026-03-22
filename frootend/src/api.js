@@ -15,6 +15,10 @@ export const endpoints = {
   register: buildUrl("/public/register"),
   login: buildUrl("/public/login"),
   recover: buildUrl("/public/recover"),
+  validateInvite: (token) => buildUrl(`/public/invite/validate?token=${encodeURIComponent(token || "")}`),
+  acceptInvite: buildUrl("/public/invite/accept"),
+  validateResetPassword: (token) => buildUrl(`/public/reset-password/validate?token=${encodeURIComponent(token || "")}`),
+  resetPassword: buildUrl("/public/reset-password"),
   adminLogin: buildUrl("/admin/login"),
   adminMe: buildUrl("/admin/me"),
 
@@ -57,6 +61,7 @@ export const endpoints = {
     buildUrl(`/admin/inventory/alerts?threshold=${encodeURIComponent(threshold)}`),
   adminStaff: buildUrl("/admin/staff"),
   adminStaffById: (id) => buildUrl(`/admin/staff/${id}`),
+  adminStaffInvite: (id) => buildUrl(`/admin/staff/${id}/invite`),
   adminBackupCollections: buildUrl("/admin/respaldos/colecciones"),
   adminBackupHistory: buildUrl("/admin/respaldos/historial"),
   adminBackupCreate: buildUrl("/admin/respaldos/crear"),

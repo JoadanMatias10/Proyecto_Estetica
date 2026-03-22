@@ -10,11 +10,22 @@ const Service = require("../models/Servicio");
 const CompanyInfo = require("../models/InformacionEmpresa");
 const CarouselSlide = require("../models/DiapositivaCarrusel");
 const StaffMember = require("../models/MiembroPersonal");
+const AccountAccessToken = require("../models/TokenAccesoCuenta");
 const Promotion = require("../models/Promocion");
 const Sale = require("../models/Venta");
 const InventoryMovement = require("../models/MovimientoInventario");
 const { verifyPassword } = require("../utils/contrasena");
 const { createToken, verifyToken } = require("../utils/auth");
+const {
+  ACCOUNT_STATUS,
+  INVITE_EXPIRATION_MS,
+  canUseAdminPanel,
+  createPlaceholderCredentials,
+  issueAccessToken,
+  mapStaffRoleToUserRole,
+  mapUserRoleToStaffRole,
+  sendInviteEmail,
+} = require("../utils/accountAccess");
 const { normalizeString } = require("../utils/validadores");
 const {
   SERVICE_SEGMENTS,
@@ -143,7 +154,7 @@ function requireAdmin(req, res, next) {
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const payload = verifyToken(token);
-  if (!payload || payload.role !== "admin") {
+  if (!payload || !canUseAdminPanel(payload.role)) {
     return res.status(401).json({ errors: ["No autorizado."] });
   }
   req.admin = payload;
@@ -164,7 +175,7 @@ function sanitizeStaffStatus(value) {
 
 function sanitizeStaffRole(value) {
   const normalized = sanitizeText(value);
-  const allowed = ["Administrador", "Estilista", "Recepcionista"];
+  const allowed = ["Administrador", "Estilista"];
   return allowed.includes(normalized) ? normalized : "Estilista";
 }
 
@@ -233,42 +244,47 @@ async function normalizeCarouselOrder() {
 }
 
 async function syncAdminUsersAsStaff() {
-  const adminUsers = await User.find({ role: "admin" })
-    .select("nombre username correo telefono")
+  const adminUsers = await User.find({ role: { $in: ["admin", "stylist"] } })
+    .select("nombre username correo telefono role accountStatus")
     .lean();
 
   for (const adminUser of adminUsers) {
     const email = sanitizeText(adminUser.correo).toLowerCase();
     const telefono = sanitizeText(adminUser.telefono);
     const nombre = sanitizeText(adminUser.nombre || adminUser.username || "Administrador");
+    const rol = mapUserRoleToStaffRole(adminUser.role) || "Estilista";
+    const estado = adminUser.accountStatus === ACCOUNT_STATUS.INACTIVE ? "Inactivo" : "Activo";
     if (!email || !telefono || !nombre) continue;
 
     const byEmail = await findOneCaseInsensitive(StaffMember, "email", email);
     if (byEmail) {
+      byEmail.userId = adminUser._id;
       byEmail.nombre = nombre;
-      byEmail.rol = "Administrador";
+      byEmail.rol = rol;
       byEmail.telefono = telefono;
-      byEmail.estado = "Activo";
+      byEmail.estado = estado;
       await byEmail.save();
       continue;
     }
 
     const byPhone = await StaffMember.findOne({ telefono });
     if (byPhone) {
+      byPhone.userId = adminUser._id;
       byPhone.nombre = nombre;
-      byPhone.rol = "Administrador";
+      byPhone.rol = rol;
       byPhone.email = email;
-      byPhone.estado = "Activo";
+      byPhone.estado = estado;
       await byPhone.save();
       continue;
     }
 
     await StaffMember.create({
+      userId: adminUser._id,
       nombre,
-      rol: "Administrador",
+      rol,
       email,
       telefono,
-      estado: "Activo",
+      estado,
     });
   }
 }
@@ -406,6 +422,7 @@ registrarAuthAdminRoutes(router, {
   getState,
   registerFailure,
   clearState,
+  canUseAdminPanel,
   User,
   verifyPassword,
   createToken,
@@ -443,6 +460,13 @@ registrarStaffAdminRoutes(router, {
   sanitizeStaffStatus,
   findOneCaseInsensitive,
   User,
+  AccountAccessToken,
+  ACCOUNT_STATUS,
+  INVITE_EXPIRATION_MS,
+  createPlaceholderCredentials,
+  issueAccessToken,
+  mapStaffRoleToUserRole,
+  sendInviteEmail,
   isValidId,
 });
 

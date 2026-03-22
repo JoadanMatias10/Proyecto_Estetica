@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const staffMemberSchema = new mongoose.Schema(
   {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     nombre: { type: String, required: true, trim: true },
     rol: { type: String, required: true, trim: true },
     email: { type: String, required: true, trim: true, lowercase: true },
@@ -13,5 +14,6 @@ const staffMemberSchema = new mongoose.Schema(
 
 staffMemberSchema.index({ email: 1 }, { unique: true });
 staffMemberSchema.index({ telefono: 1 }, { unique: true });
+staffMemberSchema.index({ userId: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("StaffMember", staffMemberSchema);
