@@ -184,8 +184,15 @@ export default function ConsultaServicio() {
 
       <div className={`relative ${isLoading ? "min-h-[420px]" : ""}`}>
         {(isLoading || isFilterLoading) && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-3xl bg-white/70 backdrop-blur-sm">
-            <LoadingSpinner fullScreen={false} className="py-10" showText text="Cargando" />
+          <div className="absolute inset-0 z-10 flex items-start justify-center rounded-3xl bg-white/70 pt-20 backdrop-blur-sm sm:pt-24">
+            <LoadingSpinner
+              fullScreen={false}
+              className="py-6"
+              showText
+              text="Cargando servicios"
+              spinnerClassName="h-12 w-12 border-[3px] border-sky-200 border-t-blue-600"
+              textClassName="mt-4 text-base font-semibold text-blue-600 sm:text-lg"
+            />
           </div>
         )}
 

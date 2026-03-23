@@ -439,7 +439,14 @@ export default function CatalogoProductosAdmin() {
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         {loading ? (
-          <LoadingSpinner fullScreen={false} text="Cargando productos..." className="py-14" />
+          <LoadingSpinner
+            fullScreen={false}
+            text="Cargando productos..."
+            showText
+            className="py-14"
+            spinnerClassName="h-12 w-12 border-[3px] border-sky-200 border-t-blue-600"
+            textClassName="mt-4 text-base font-semibold text-blue-600 sm:text-lg"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-slate-600">
