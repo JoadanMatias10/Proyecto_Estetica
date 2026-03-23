@@ -24,7 +24,7 @@ const PRESENTATION_UNITS = [
 ];
 
 const PRESENTATION_QUANTITIES = {
-  ml: [30, 60, 125, 250, 500, 1000],
+  ml: [30, 60, 100, 125, 200, 250, 500, 1000],
   g: [50, 100, 150, 250, 500, 1000],
 };
 
