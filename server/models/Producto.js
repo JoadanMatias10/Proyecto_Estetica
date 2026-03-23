@@ -11,6 +11,7 @@ const productSchema = new mongoose.Schema(
     categoria: { type: String, required: true, trim: true },
     descripcion: { type: String, default: "", trim: true },
     imagen: { type: String, default: "" },
+    imagenPublicId: { type: String, default: "", trim: true },
     imagenNombre: { type: String, default: "", trim: true },
     rating: { type: Number, default: 4.8, min: 0, max: 5 },
   },

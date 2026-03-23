@@ -40,6 +40,7 @@ const registrarInventarioAdminRoutes = require("./administrador/inventarioAdmin"
 const registrarStaffAdminRoutes = require("./administrador/staffAdmin");
 const registrarCatalogoAdminRoutes = require("./administrador/catalogoAdmin");
 const upload = require("../middleware/multer");
+const cloudinary = require("../config/cloudinary");
 
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 10 * 60 * 1000;
@@ -495,6 +496,7 @@ registrarCatalogoAdminRoutes(router, {
   ALLOWED_POLICY_DOCUMENT_TYPES,
   MAX_POLICY_DOCUMENT_BYTES,
   upload,
+  cloudinary,
 });
 
 

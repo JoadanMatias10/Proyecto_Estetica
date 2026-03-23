@@ -42,6 +42,7 @@ function registrarCatalogoAdminRoutes(router, contexto) {
     ALLOWED_POLICY_DOCUMENT_TYPES,
     MAX_POLICY_DOCUMENT_BYTES,
     upload,
+    cloudinary,
   } = contexto;
 
 const EXCEL_PRODUCT_COLUMNS = [
@@ -55,6 +56,43 @@ const EXCEL_PRODUCT_COLUMNS = [
 ];
 
 const excelUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+const CLOUDINARY_UNAVAILABLE_MESSAGE =
+  "La carga de imagenes no esta disponible. Configura CLOUDINARY_NAME, CLOUDINARY_KEY y CLOUDINARY_SECRET en el servidor.";
+
+function isDataUrlImage(value) {
+  return /^data:image\//i.test(String(value || "").trim());
+}
+
+async function destroyProductImage(publicId) {
+  const normalizedPublicId = sanitizeText(publicId);
+  if (!normalizedPublicId) return;
+
+  try {
+    await cloudinary.uploader.destroy(normalizedPublicId, {
+      invalidate: true,
+      resource_type: "image",
+    });
+  } catch (error) {
+    console.error("No fue posible eliminar la imagen del producto en Cloudinary:", error);
+  }
+}
+
+async function cleanupUploadedProductImage(uploadedImage) {
+  const uploadedPublicId = sanitizeText(uploadedImage?.filename || uploadedImage?.public_id);
+  if (!uploadedPublicId) return;
+  await destroyProductImage(uploadedPublicId);
+}
+
+function requireCloudinaryUploadSupport(req, res, next) {
+  const contentType = String(req.headers["content-type"] || "").toLowerCase();
+  const isMultipartRequest = contentType.includes("multipart/form-data");
+
+  if (!isMultipartRequest || cloudinary.isConfigured) {
+    return next();
+  }
+
+  return res.status(503).json({ errors: [CLOUDINARY_UNAVAILABLE_MESSAGE] });
+}
 
 function normalizeImportHeader(value) {
   return sanitizeText(value)
@@ -401,12 +439,17 @@ router.post("/products/import", excelUpload.single("archivo"), async (req, res) 
 
       if (imagen) {
         productData.imagen = imagen;
+        productData.imagenPublicId = "";
       }
 
       const existingByName = await Product.findOne({ nombre, marca, categoria });
       if (existingByName) {
+        const previousImagePublicId = sanitizeText(existingByName.imagenPublicId);
         Object.assign(existingByName, productData);
         await existingByName.save();
+        if (imagen && previousImagePublicId) {
+          await destroyProductImage(previousImagePublicId);
+        }
         updated += 1;
         continue;
       }
@@ -430,13 +473,14 @@ router.post("/products/import", excelUpload.single("archivo"), async (req, res) 
   }
 });
 
-router.post("/products", upload.single("imagen"), async (req, res) => {
+router.post("/products", requireCloudinaryUploadSupport, upload.single("imagen"), async (req, res) => {
   const uploadedImage = req.file;
   const nombre = sanitizeText(req.body.nombre);
   const marca = sanitizeText(req.body.marca);
   const categoria = sanitizeText(req.body.categoria);
   const descripcion = sanitizeText(req.body.descripcion);
   const imagen = sanitizeText(uploadedImage?.path || req.body.imagen);
+  const imagenPublicId = sanitizeText(uploadedImage?.filename || req.body.imagenPublicId);
   const imagenNombre = sanitizeText(uploadedImage?.originalname || req.body.imagenNombre);
   const precio = parsePositiveNumber(req.body.precio, NaN);
   const stock = parsePositiveNumber(req.body.stock, NaN);
@@ -453,6 +497,7 @@ router.post("/products", upload.single("imagen"), async (req, res) => {
   if (!Number.isFinite(cantidadMedida) || cantidadMedida <= 0) errors.push("Cantidad de medida invalida.");
   if (!unidadMedida) errors.push("Unidad de medida invalida.");
   if (!imagen) errors.push("La imagen del producto es obligatoria.");
+  if (isDataUrlImage(imagen)) errors.push("La imagen debe enviarse como archivo o URL valida, no en base64.");
 
   const category = await ProductCategory.findOne({ nombre: categoria });
   if (!category) {
@@ -462,33 +507,45 @@ router.post("/products", upload.single("imagen"), async (req, res) => {
   const brand = await ProductBrand.findOne({ nombre: marca });
   if (!brand) errors.push("La marca seleccionada no existe.");
 
-  if (errors.length) return res.status(400).json({ errors });
+  if (errors.length) {
+    await cleanupUploadedProductImage(uploadedImage);
+    return res.status(400).json({ errors });
+  }
 
-  const product = await Product.create({
-    nombre,
-    marca,
-    precio,
-    stock,
-    cantidadMedida,
-    unidadMedida,
-    categoria,
-    descripcion,
-    imagen,
-    imagenNombre,
-    rating: Math.min(Math.max(rating, 0), 5),
-  });
+  try {
+    const product = await Product.create({
+      nombre,
+      marca,
+      precio,
+      stock,
+      cantidadMedida,
+      unidadMedida,
+      categoria,
+      descripcion,
+      imagen,
+      imagenPublicId,
+      imagenNombre,
+      rating: Math.min(Math.max(rating, 0), 5),
+    });
 
-  return res.status(201).json({ product: mapId(product.toObject()) });
+    return res.status(201).json({ product: mapId(product.toObject()) });
+  } catch (error) {
+    await cleanupUploadedProductImage(uploadedImage);
+    throw error;
+  }
 });
 
-router.put("/products/:id", async (req, res) => {
+router.put("/products/:id", requireCloudinaryUploadSupport, upload.single("imagen"), async (req, res) => {
+  const uploadedImage = req.file;
   const { id } = req.params;
   if (!isValidId(id)) {
+    await cleanupUploadedProductImage(uploadedImage);
     return res.status(400).json({ errors: ["Producto invalido."] });
   }
 
   const current = await Product.findById(id);
   if (!current) {
+    await cleanupUploadedProductImage(uploadedImage);
     return res.status(404).json({ errors: ["Producto no encontrado."] });
   }
 
@@ -496,8 +553,9 @@ router.put("/products/:id", async (req, res) => {
   const marca = sanitizeText(req.body.marca);
   const categoria = sanitizeText(req.body.categoria);
   const descripcion = sanitizeText(req.body.descripcion);
-  const imagen = sanitizeText(req.body.imagen);
-  const imagenNombre = sanitizeText(req.body.imagenNombre);
+  const imagen = sanitizeText(uploadedImage?.path || req.body.imagen);
+  const imagenPublicId = sanitizeText(uploadedImage?.filename || req.body.imagenPublicId);
+  const imagenNombre = sanitizeText(uploadedImage?.originalname || req.body.imagenNombre);
   const precio = parsePositiveNumber(req.body.precio, NaN);
   const stock = parsePositiveNumber(req.body.stock, NaN);
   const cantidadMedida = parsePositiveNumber(req.body.cantidadMedida, NaN);
@@ -512,6 +570,7 @@ router.put("/products/:id", async (req, res) => {
   if (!Number.isFinite(stock)) errors.push("Stock invalido.");
   if (!Number.isFinite(cantidadMedida) || cantidadMedida <= 0) errors.push("Cantidad de medida invalida.");
   if (!unidadMedida) errors.push("Unidad de medida invalida.");
+  if (isDataUrlImage(imagen)) errors.push("La imagen debe enviarse como archivo o URL valida, no en base64.");
 
   const category = await ProductCategory.findOne({ nombre: categoria });
   if (!category) {
@@ -521,22 +580,45 @@ router.put("/products/:id", async (req, res) => {
   const brand = await ProductBrand.findOne({ nombre: marca });
   if (!brand) errors.push("La marca seleccionada no existe.");
 
-  if (errors.length) return res.status(400).json({ errors });
+  if (errors.length) {
+    await cleanupUploadedProductImage(uploadedImage);
+    return res.status(400).json({ errors });
+  }
 
-  current.nombre = nombre;
-  current.marca = marca;
-  current.precio = precio;
-  current.stock = stock;
-  current.cantidadMedida = cantidadMedida;
-  current.unidadMedida = unidadMedida;
-  current.categoria = categoria;
-  current.descripcion = descripcion;
-  current.imagen = imagen || current.imagen || "";
-  current.imagenNombre = imagenNombre;
-  current.rating = Math.min(Math.max(rating, 0), 5);
-  await current.save();
+  const previousImagePublicId = sanitizeText(current.imagenPublicId);
 
-  return res.json({ product: mapId(current.toObject()) });
+  try {
+    current.nombre = nombre;
+    current.marca = marca;
+    current.precio = precio;
+    current.stock = stock;
+    current.cantidadMedida = cantidadMedida;
+    current.unidadMedida = unidadMedida;
+    current.categoria = categoria;
+    current.descripcion = descripcion;
+    current.rating = Math.min(Math.max(rating, 0), 5);
+
+    if (uploadedImage?.path) {
+      current.imagen = imagen;
+      current.imagenPublicId = imagenPublicId;
+      current.imagenNombre = imagenNombre;
+    } else if (imagen) {
+      current.imagen = imagen;
+      current.imagenPublicId = imagenPublicId;
+      current.imagenNombre = imagenNombre || current.imagenNombre;
+    }
+
+    await current.save();
+
+    if (uploadedImage?.path && previousImagePublicId && previousImagePublicId !== imagenPublicId) {
+      await destroyProductImage(previousImagePublicId);
+    }
+
+    return res.json({ product: mapId(current.toObject()) });
+  } catch (error) {
+    await cleanupUploadedProductImage(uploadedImage);
+    throw error;
+  }
 });
 
 router.delete("/products/:id", async (req, res) => {
@@ -549,6 +631,7 @@ router.delete("/products/:id", async (req, res) => {
   if (!deleted) {
     return res.status(404).json({ errors: ["Producto no encontrado."] });
   }
+  await destroyProductImage(deleted.imagenPublicId);
   return res.json({ message: "Producto eliminado." });
 });
 

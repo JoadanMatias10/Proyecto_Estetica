@@ -32,6 +32,7 @@ const DEFAULT_PRESENTATION_QUANTITY = {
   ml: 250,
   g: 250,
 };
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 function getDefaultPresentationQuantity(unit) {
   const options = PRESENTATION_QUANTITIES[unit];
@@ -70,7 +71,8 @@ const getDefaultFormValues = (product, categories, brands) => {
 };
 
 export default function CatalogoProductosAdmin() {
-  const fileInputRef = useRef(null);
+  const importInputRef = useRef(null);
+  const imageInputRef = useRef(null);
   const [productos, setProductos] = useState([]);
   const [categoryRecords, setCategoryRecords] = useState([]);
   const [brandRecords, setBrandRecords] = useState([]);
@@ -81,6 +83,7 @@ export default function CatalogoProductosAdmin() {
   const [importSummary, setImportSummary] = useState(null);
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
   const categories = useMemo(() => getCategoryNames(categoryRecords), [categoryRecords]);
   const brands = useMemo(() => brandRecords.map((brand) => brand.nombre), [brandRecords]);
   const [formValues, setFormValues] = useState(() =>
@@ -139,11 +142,15 @@ export default function CatalogoProductosAdmin() {
 
   const openModal = (product = null) => {
     setCurrentProduct(product);
+    setSelectedImageFile(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
     setFormValues(getDefaultFormValues(product, availableCategories, brands));
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
+    setSelectedImageFile(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
     setIsModalOpen(false);
     setCurrentProduct(null);
   };
@@ -184,6 +191,13 @@ export default function CatalogoProductosAdmin() {
       window.alert("Selecciona un archivo de imagen valido.");
       return;
     }
+    if (file.size > MAX_IMAGE_BYTES) {
+      window.alert("La imagen no puede pesar mas de 5 MB.");
+      if (imageInputRef.current) imageInputRef.current.value = "";
+      return;
+    }
+
+    setSelectedImageFile(file);
 
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -197,7 +211,13 @@ export default function CatalogoProductosAdmin() {
   };
 
   const handleClearImage = () => {
-    setFormValues((prev) => ({ ...prev, imagen: "", imagenNombre: "" }));
+    setSelectedImageFile(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+    setFormValues((prev) => ({
+      ...prev,
+      imagen: currentProduct?.imagen || "",
+      imagenNombre: currentProduct?.imagenNombre || "",
+    }));
   };
 
   const handleExportProducts = async () => {
@@ -268,7 +288,7 @@ export default function CatalogoProductosAdmin() {
     } catch (error) {
       window.alert(error.message || "No fue posible importar productos.");
     } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (importInputRef.current) importInputRef.current.value = "";
       setImporting(false);
     }
   };
@@ -288,24 +308,35 @@ export default function CatalogoProductosAdmin() {
       window.alert("Selecciona cantidad y unidad de presentacion.");
       return;
     }
-    if (!currentProduct && !formValues.imagen) {
+    if (!currentProduct && !selectedImageFile) {
       window.alert("Selecciona una imagen para el producto.");
       return;
     }
 
-    const payload = {
+    const payloadBase = {
       nombre: formValues.nombre.trim(),
       marca: formValues.marca.trim(),
       precio: Number(formValues.precio),
       stock: Number(formValues.stock),
       categoria: formValues.categoria,
       descripcion: formValues.descripcion.trim(),
-      imagen: formValues.imagen || "",
-      imagenNombre: formValues.imagenNombre || "",
       cantidadMedida: Number(formValues.cantidadMedida),
       unidadMedida: formValues.unidadMedida,
       rating: currentProduct?.rating || 4.8,
     };
+
+    const shouldUseFormData = Boolean(selectedImageFile) || !currentProduct;
+    const payload = shouldUseFormData ? new FormData() : payloadBase;
+
+    if (shouldUseFormData) {
+      Object.entries(payloadBase).forEach(([key, value]) => {
+        payload.append(key, String(value));
+      });
+
+      if (selectedImageFile) {
+        payload.append("imagen", selectedImageFile);
+      }
+    }
 
     setSubmitting(true);
     try {
@@ -361,7 +392,7 @@ export default function CatalogoProductosAdmin() {
           </label>
           <input
             id="productos-excel-import"
-            ref={fileInputRef}
+            ref={importInputRef}
             type="file"
             accept=".xlsx,.xls"
             onChange={handleImportProducts}
@@ -632,6 +663,7 @@ export default function CatalogoProductosAdmin() {
               )}
               <input
                 id="imagen-producto-input"
+                ref={imageInputRef}
                 type="file"
                 accept="image/*"
                 onChange={handleImageChange}

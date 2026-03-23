@@ -36,6 +36,15 @@ app.use((req, res) => {
   res.status(404).json({ error: "Ruta no encontrada." });
 });
 
+app.use((error, _req, res, _next) => {
+  if (error?.name === "MulterError" && error.code === "LIMIT_FILE_SIZE") {
+    return res.status(400).json({ errors: ["La imagen excede el limite de 5 MB."] });
+  }
+
+  console.error("Error procesando solicitud:", error);
+  return res.status(500).json({ error: "Error interno del servidor." });
+});
+
 async function start() {
   if (!MONGODB_URI) {
     throw new Error("Falta configurar MONGODB_URI en el archivo .env");

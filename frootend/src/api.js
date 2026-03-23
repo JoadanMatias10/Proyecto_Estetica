@@ -71,15 +71,16 @@ export const endpoints = {
 
 export async function requestJson(url, options = {}) {
   const { method = "GET", body, token, headers = {} } = options;
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
 
   const response = await fetch(url, {
     method,
     headers: {
-      ...(body ? { "Content-Type": "application/json" } : {}),
+      ...(body && !isFormData ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...headers,
     },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    ...(body ? { body: isFormData ? body : JSON.stringify(body) } : {}),
   });
 
   const data = await response.json().catch(() => ({}));
