@@ -164,13 +164,13 @@ export default function Catalogo() {
               <motion.div
                 key={product.id}
                 whileHover={{ y: -6 }}
-                className="card hover:shadow-xl transition-shadow duration-300 rounded-2xl overflow-hidden group"
+                className="card hover:shadow-xl transition-shadow duration-300 rounded-2xl overflow-hidden group flex h-full flex-col"
               >
-                <div className="h-44 bg-gradient-to-br from-violet-100 to-rose-100 flex items-center justify-center relative overflow-hidden">
+                <div className="h-56 sm:h-60 bg-gradient-to-br from-violet-100 to-rose-100 flex items-center justify-center relative overflow-hidden">
                   <img
                     src={product.imagen || `https://placehold.co/600x400/EDE9FE/7C3AED?text=AVYNA`}
                     alt={product.nombre}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    className="w-full h-full object-contain p-4 sm:p-5 transition-transform duration-500 group-hover:scale-105 drop-shadow-[0_18px_28px_rgba(15,23,42,0.14)]"
                   />
                   <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <span className="bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold text-indigo-600 shadow-sm">
@@ -178,7 +178,7 @@ export default function Catalogo() {
                     </span>
                   </div>
                 </div>
-                <div className="p-5">
+                <div className="p-5 flex flex-1 flex-col">
                   <div className="flex justify-between items-start gap-3">
                     <h3 className="font-bold text-lg text-slate-800 leading-tight">{product.nombre}</h3>
                     <span className="text-amber-500 font-bold text-sm bg-amber-50 px-1.5 rounded border border-amber-100 flex items-center h-fit">* {Number(product.rating || 4.8).toFixed(1)}</span>
@@ -186,7 +186,7 @@ export default function Catalogo() {
                   <div className="mt-2 text-slate-500 font-medium">
                     <span className="font-bold text-rose-600 text-xl">${Number(product.precio || 0).toFixed(2)}</span> <span className="text-xs">MXN</span>
                   </div>
-                  <div className="mt-4 flex gap-3">
+                  <div className="mt-auto flex gap-3 pt-4">
                     <Link to={`/productos/${product.id}`} className="w-full">
                       <Button className="w-full py-2.5">Ver detalle</Button>
                     </Link>

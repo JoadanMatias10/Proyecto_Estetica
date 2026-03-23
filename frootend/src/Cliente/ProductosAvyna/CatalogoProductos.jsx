@@ -165,11 +165,11 @@ export default function CatalogoProductos() {
           ) : filteredProductos.length > 0 ? (
             filteredProductos.map((product) => (
               <div key={product.id} className="card hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group rounded-2xl overflow-hidden flex flex-col h-full border border-slate-100/50">
-                <div className="h-48 bg-gradient-to-br from-violet-50 to-rose-50 relative overflow-hidden group-hover:from-violet-100 group-hover:to-rose-100 transition-colors duration-500">
+                <div className="h-56 sm:h-60 bg-gradient-to-br from-violet-50 to-rose-50 relative overflow-hidden group-hover:from-violet-100 group-hover:to-rose-100 transition-colors duration-500">
                   <img
                     src={product.imagen || `https://placehold.co/800x500/F5F3FF/7C3AED?text=AVYNA`}
                     alt={product.nombre}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-90 group-hover:opacity-100"
+                    className="w-full h-full object-contain p-4 sm:p-5 transition-transform duration-700 group-hover:scale-105 opacity-95 group-hover:opacity-100 drop-shadow-[0_18px_28px_rgba(15,23,42,0.14)]"
                   />
                   <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
                     <span className="bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[10px] font-bold text-rose-500 shadow-sm border border-rose-100 text-center">
