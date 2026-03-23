@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
@@ -6,6 +6,7 @@ import SidebarIcon from "../../components/ui/SidebarIcon";
 import { endpoints, requestJson } from "../../api";
 
 const FALLBACK_SEGMENTS = ["Mujer", "Hombre", "Nino"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 function getAdminToken() {
   return localStorage.getItem("adminToken") || "";
@@ -45,12 +46,14 @@ function getDefaultFormValues(service = null, serviceCategories = []) {
 }
 
 export default function GestionServicios() {
+  const imageInputRef = useRef(null);
   const [servicios, setServicios] = useState([]);
   const [serviceCategories, setServiceCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentService, setCurrentService] = useState(null);
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
   const [formValues, setFormValues] = useState(getDefaultFormValues());
 
   const segments = useMemo(
@@ -96,11 +99,15 @@ export default function GestionServicios() {
 
   const openModal = (service = null) => {
     setCurrentService(service);
+    setSelectedImageFile(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
     setFormValues(getDefaultFormValues(service, serviceCategories));
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
+    setSelectedImageFile(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
     setIsModalOpen(false);
     setCurrentService(null);
     setFormValues(getDefaultFormValues(null, serviceCategories));
@@ -142,6 +149,13 @@ export default function GestionServicios() {
       window.alert("Selecciona un archivo de imagen valido.");
       return;
     }
+    if (file.size > MAX_IMAGE_BYTES) {
+      window.alert("La imagen no puede pesar mas de 5 MB.");
+      if (imageInputRef.current) imageInputRef.current.value = "";
+      return;
+    }
+
+    setSelectedImageFile(file);
 
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -155,7 +169,13 @@ export default function GestionServicios() {
   };
 
   const handleClearImage = () => {
-    setFormValues((prev) => ({ ...prev, imagen: "", imagenNombre: "" }));
+    setSelectedImageFile(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+    setFormValues((prev) => ({
+      ...prev,
+      imagen: currentService?.imagen || "",
+      imagenNombre: currentService?.imagenNombre || "",
+    }));
   };
 
   const handleSubmit = async (event) => {
@@ -164,21 +184,32 @@ export default function GestionServicios() {
       window.alert("Selecciona una subcategoria valida.");
       return;
     }
-    if (!currentService && !formValues.imagen) {
+    if (!currentService && !selectedImageFile) {
       window.alert("Selecciona una imagen para el servicio.");
       return;
     }
 
-    const payload = {
+    const payloadBase = {
       nombre: formValues.nombre.trim(),
       segmento: formValues.segmento,
       subcategoria: formValues.subcategoria,
       precio: Number(formValues.precio),
       tiempo: formValues.tiempo.trim(),
       descripcion: formValues.descripcion.trim(),
-      imagen: formValues.imagen || "",
-      imagenNombre: formValues.imagenNombre || "",
     };
+
+    const shouldUseFormData = Boolean(selectedImageFile) || !currentService;
+    const payload = shouldUseFormData ? new FormData() : payloadBase;
+
+    if (shouldUseFormData) {
+      Object.entries(payloadBase).forEach(([key, value]) => {
+        payload.append(key, String(value));
+      });
+
+      if (selectedImageFile) {
+        payload.append("imagen", selectedImageFile);
+      }
+    }
 
     setSubmitting(true);
     try {
@@ -407,6 +438,7 @@ export default function GestionServicios() {
               )}
               <input
                 id="imagen-servicio-input"
+                ref={imageInputRef}
                 type="file"
                 accept="image/*"
                 onChange={handleImageChange}

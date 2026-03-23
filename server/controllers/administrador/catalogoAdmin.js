@@ -42,6 +42,7 @@ function registrarCatalogoAdminRoutes(router, contexto) {
     ALLOWED_POLICY_DOCUMENT_TYPES,
     MAX_POLICY_DOCUMENT_BYTES,
     upload,
+    serviceUpload,
     cloudinary,
   } = contexto;
 
@@ -63,7 +64,7 @@ function isDataUrlImage(value) {
   return /^data:image\//i.test(String(value || "").trim());
 }
 
-async function destroyProductImage(publicId) {
+async function destroyCloudinaryImage(publicId) {
   const normalizedPublicId = sanitizeText(publicId);
   if (!normalizedPublicId) return;
 
@@ -77,10 +78,10 @@ async function destroyProductImage(publicId) {
   }
 }
 
-async function cleanupUploadedProductImage(uploadedImage) {
+async function cleanupUploadedCloudinaryImage(uploadedImage) {
   const uploadedPublicId = sanitizeText(uploadedImage?.filename || uploadedImage?.public_id);
   if (!uploadedPublicId) return;
-  await destroyProductImage(uploadedPublicId);
+  await destroyCloudinaryImage(uploadedPublicId);
 }
 
 function requireCloudinaryUploadSupport(req, res, next) {
@@ -448,7 +449,7 @@ router.post("/products/import", excelUpload.single("archivo"), async (req, res) 
         Object.assign(existingByName, productData);
         await existingByName.save();
         if (imagen && previousImagePublicId) {
-          await destroyProductImage(previousImagePublicId);
+          await destroyCloudinaryImage(previousImagePublicId);
         }
         updated += 1;
         continue;
@@ -508,7 +509,7 @@ router.post("/products", requireCloudinaryUploadSupport, upload.single("imagen")
   if (!brand) errors.push("La marca seleccionada no existe.");
 
   if (errors.length) {
-    await cleanupUploadedProductImage(uploadedImage);
+    await cleanupUploadedCloudinaryImage(uploadedImage);
     return res.status(400).json({ errors });
   }
 
@@ -530,7 +531,7 @@ router.post("/products", requireCloudinaryUploadSupport, upload.single("imagen")
 
     return res.status(201).json({ product: mapId(product.toObject()) });
   } catch (error) {
-    await cleanupUploadedProductImage(uploadedImage);
+    await cleanupUploadedCloudinaryImage(uploadedImage);
     throw error;
   }
 });
@@ -539,13 +540,13 @@ router.put("/products/:id", requireCloudinaryUploadSupport, upload.single("image
   const uploadedImage = req.file;
   const { id } = req.params;
   if (!isValidId(id)) {
-    await cleanupUploadedProductImage(uploadedImage);
+    await cleanupUploadedCloudinaryImage(uploadedImage);
     return res.status(400).json({ errors: ["Producto invalido."] });
   }
 
   const current = await Product.findById(id);
   if (!current) {
-    await cleanupUploadedProductImage(uploadedImage);
+    await cleanupUploadedCloudinaryImage(uploadedImage);
     return res.status(404).json({ errors: ["Producto no encontrado."] });
   }
 
@@ -581,7 +582,7 @@ router.put("/products/:id", requireCloudinaryUploadSupport, upload.single("image
   if (!brand) errors.push("La marca seleccionada no existe.");
 
   if (errors.length) {
-    await cleanupUploadedProductImage(uploadedImage);
+    await cleanupUploadedCloudinaryImage(uploadedImage);
     return res.status(400).json({ errors });
   }
 
@@ -611,12 +612,12 @@ router.put("/products/:id", requireCloudinaryUploadSupport, upload.single("image
     await current.save();
 
     if (uploadedImage?.path && previousImagePublicId && previousImagePublicId !== imagenPublicId) {
-      await destroyProductImage(previousImagePublicId);
+      await destroyCloudinaryImage(previousImagePublicId);
     }
 
     return res.json({ product: mapId(current.toObject()) });
   } catch (error) {
-    await cleanupUploadedProductImage(uploadedImage);
+    await cleanupUploadedCloudinaryImage(uploadedImage);
     throw error;
   }
 });
@@ -631,7 +632,7 @@ router.delete("/products/:id", async (req, res) => {
   if (!deleted) {
     return res.status(404).json({ errors: ["Producto no encontrado."] });
   }
-  await destroyProductImage(deleted.imagenPublicId);
+  await destroyCloudinaryImage(deleted.imagenPublicId);
   return res.json({ message: "Producto eliminado." });
 });
 
@@ -744,13 +745,15 @@ router.get("/services", async (_req, res) => {
   return res.json({ services: services.map(mapId) });
 });
 
-router.post("/services", async (req, res) => {
+router.post("/services", requireCloudinaryUploadSupport, serviceUpload.single("imagen"), async (req, res) => {
+  const uploadedImage = req.file;
   const nombre = sanitizeText(req.body.nombre);
   const segmento = sanitizeSegment(req.body.segmento);
   const subcategoria = sanitizeText(req.body.subcategoria);
   const descripcion = sanitizeText(req.body.descripcion);
-  const imagen = sanitizeText(req.body.imagen);
-  const imagenNombre = sanitizeText(req.body.imagenNombre);
+  const imagen = sanitizeText(uploadedImage?.path || req.body.imagen);
+  const imagenPublicId = sanitizeText(uploadedImage?.filename || req.body.imagenPublicId);
+  const imagenNombre = sanitizeText(uploadedImage?.originalname || req.body.imagenNombre);
   const tiempo = sanitizeText(req.body.tiempo);
   const precio = parsePositiveNumber(req.body.precio, NaN);
 
@@ -760,36 +763,49 @@ router.post("/services", async (req, res) => {
   if (!tiempo) errors.push("Tiempo estimado es obligatorio.");
   if (!Number.isFinite(precio)) errors.push("Precio invalido.");
   if (!imagen) errors.push("La imagen del servicio es obligatoria.");
+  if (isDataUrlImage(imagen)) errors.push("La imagen debe enviarse como archivo o URL valida, no en base64.");
 
   const category = await ServiceCategory.findOne({ segmento, nombre: subcategoria });
   if (!category) {
     errors.push("La subcategoria no existe para el segmento seleccionado.");
   }
 
-  if (errors.length) return res.status(400).json({ errors });
+  if (errors.length) {
+    await cleanupUploadedCloudinaryImage(uploadedImage);
+    return res.status(400).json({ errors });
+  }
 
-  const service = await Service.create({
-    nombre,
-    segmento,
-    subcategoria,
-    precio,
-    tiempo,
-    descripcion,
-    imagen,
-    imagenNombre,
-  });
+  try {
+    const service = await Service.create({
+      nombre,
+      segmento,
+      subcategoria,
+      precio,
+      tiempo,
+      descripcion,
+      imagen,
+      imagenPublicId,
+      imagenNombre,
+    });
 
-  return res.status(201).json({ service: mapId(service.toObject()) });
+    return res.status(201).json({ service: mapId(service.toObject()) });
+  } catch (error) {
+    await cleanupUploadedCloudinaryImage(uploadedImage);
+    throw error;
+  }
 });
 
-router.put("/services/:id", async (req, res) => {
+router.put("/services/:id", requireCloudinaryUploadSupport, serviceUpload.single("imagen"), async (req, res) => {
+  const uploadedImage = req.file;
   const { id } = req.params;
   if (!isValidId(id)) {
+    await cleanupUploadedCloudinaryImage(uploadedImage);
     return res.status(400).json({ errors: ["Servicio invalido."] });
   }
 
   const current = await Service.findById(id);
   if (!current) {
+    await cleanupUploadedCloudinaryImage(uploadedImage);
     return res.status(404).json({ errors: ["Servicio no encontrado."] });
   }
 
@@ -797,8 +813,9 @@ router.put("/services/:id", async (req, res) => {
   const segmento = sanitizeSegment(req.body.segmento);
   const subcategoria = sanitizeText(req.body.subcategoria);
   const descripcion = sanitizeText(req.body.descripcion);
-  const imagen = sanitizeText(req.body.imagen);
-  const imagenNombre = sanitizeText(req.body.imagenNombre);
+  const imagen = sanitizeText(uploadedImage?.path || req.body.imagen);
+  const imagenPublicId = sanitizeText(uploadedImage?.filename || req.body.imagenPublicId);
+  const imagenNombre = sanitizeText(uploadedImage?.originalname || req.body.imagenNombre);
   const tiempo = sanitizeText(req.body.tiempo);
   const precio = parsePositiveNumber(req.body.precio, NaN);
 
@@ -807,25 +824,49 @@ router.put("/services/:id", async (req, res) => {
   if (!subcategoria) errors.push("Subcategoria es obligatoria.");
   if (!tiempo) errors.push("Tiempo estimado es obligatorio.");
   if (!Number.isFinite(precio)) errors.push("Precio invalido.");
+  if (isDataUrlImage(imagen)) errors.push("La imagen debe enviarse como archivo o URL valida, no en base64.");
 
   const category = await ServiceCategory.findOne({ segmento, nombre: subcategoria });
   if (!category) {
     errors.push("La subcategoria no existe para el segmento seleccionado.");
   }
 
-  if (errors.length) return res.status(400).json({ errors });
+  if (errors.length) {
+    await cleanupUploadedCloudinaryImage(uploadedImage);
+    return res.status(400).json({ errors });
+  }
 
-  current.nombre = nombre;
-  current.segmento = segmento;
-  current.subcategoria = subcategoria;
-  current.precio = precio;
-  current.tiempo = tiempo;
-  current.descripcion = descripcion;
-  current.imagen = imagen || current.imagen || "";
-  current.imagenNombre = imagenNombre;
-  await current.save();
+  const previousImagePublicId = sanitizeText(current.imagenPublicId);
 
-  return res.json({ service: mapId(current.toObject()) });
+  try {
+    current.nombre = nombre;
+    current.segmento = segmento;
+    current.subcategoria = subcategoria;
+    current.precio = precio;
+    current.tiempo = tiempo;
+    current.descripcion = descripcion;
+
+    if (uploadedImage?.path) {
+      current.imagen = imagen;
+      current.imagenPublicId = imagenPublicId;
+      current.imagenNombre = imagenNombre;
+    } else if (imagen) {
+      current.imagen = imagen;
+      current.imagenPublicId = imagenPublicId;
+      current.imagenNombre = imagenNombre || current.imagenNombre;
+    }
+
+    await current.save();
+
+    if (uploadedImage?.path && previousImagePublicId && previousImagePublicId !== imagenPublicId) {
+      await destroyCloudinaryImage(previousImagePublicId);
+    }
+
+    return res.json({ service: mapId(current.toObject()) });
+  } catch (error) {
+    await cleanupUploadedCloudinaryImage(uploadedImage);
+    throw error;
+  }
 });
 
 router.delete("/services/:id", async (req, res) => {
@@ -838,6 +879,7 @@ router.delete("/services/:id", async (req, res) => {
   if (!deleted) {
     return res.status(404).json({ errors: ["Servicio no encontrado."] });
   }
+  await destroyCloudinaryImage(deleted.imagenPublicId);
   return res.json({ message: "Servicio eliminado." });
 });
 

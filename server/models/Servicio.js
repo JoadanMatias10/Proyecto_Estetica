@@ -9,6 +9,7 @@ const serviceSchema = new mongoose.Schema(
     tiempo: { type: String, required: true, trim: true },
     descripcion: { type: String, default: "", trim: true },
     imagen: { type: String, default: "" },
+    imagenPublicId: { type: String, default: "", trim: true },
     imagenNombre: { type: String, default: "", trim: true },
   },
   { timestamps: true, collection: "servicios" }
