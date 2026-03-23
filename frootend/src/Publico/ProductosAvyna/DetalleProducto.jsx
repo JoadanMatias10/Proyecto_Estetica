@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import ErrorPage from "../Error/ErrorPage";
 import { endpoints, requestJson } from "../../api";
+import { formatProductPresentation } from "../../utils/productPresentation";
 
 export default function DetalleProducto() {
   const { id } = useParams();
@@ -61,6 +62,8 @@ export default function DetalleProducto() {
     );
   }
 
+  const presentation = formatProductPresentation(prod);
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <Link to="/productos" className="text-violet-600 hover:text-violet-700 text-sm font-medium transition-colors mb-8 inline-flex items-center gap-2">
@@ -89,6 +92,21 @@ export default function DetalleProducto() {
           <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-2 leading-tight">
             {prod.nombre}
           </h1>
+
+          {(presentation || prod.marca) && (
+            <div className="mt-3 flex flex-wrap gap-3">
+              {presentation && (
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-600">
+                  Presentacion: {presentation}
+                </span>
+              )}
+              {prod.marca && (
+                <span className="rounded-full bg-rose-50 px-3 py-1 text-sm font-medium text-rose-600">
+                  Marca: {prod.marca}
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="text-3xl font-bold text-rose-500 mt-4 mb-6">
             ${Number(prod.precio || 0).toFixed(2)} <span className="text-lg text-slate-400 font-normal">MXN</span>
@@ -120,6 +138,9 @@ export default function DetalleProducto() {
 
           <div className="mt-8 flex flex-col sm:flex-row gap-8 text-xs font-bold tracking-widest text-slate-400 uppercase">
             <div>Categoria: <span className="font-medium text-slate-600 ml-2">{prod.categoria}</span></div>
+            {presentation && (
+              <div>Presentacion: <span className="font-medium text-slate-600 ml-2">{presentation}</span></div>
+            )}
           </div>
         </div>
       </div>

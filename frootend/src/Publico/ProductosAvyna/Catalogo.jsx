@@ -5,6 +5,7 @@ import Button from "../../components/ui/Button";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import SidebarIcon from "../../components/ui/SidebarIcon";
 import { fetchPublicProductsBundle } from "../../utils/publicCatalogApi";
+import { formatProductPresentation } from "../../utils/productPresentation";
 
 export default function Catalogo() {
   const [productos, setProductos] = useState([]);
@@ -160,40 +161,49 @@ export default function Catalogo() {
           {isLoading ? (
             <div className="col-span-full h-[420px]" />
           ) : filteredProductos.length > 0 ? (
-            filteredProductos.map((product) => (
-              <motion.div
-                key={product.id}
-                whileHover={{ y: -6 }}
-                className="card hover:shadow-xl transition-shadow duration-300 rounded-2xl overflow-hidden group"
-              >
-                <div className="h-64 sm:h-72 bg-gradient-to-br from-violet-100 to-rose-100 flex items-center justify-center relative overflow-hidden">
-                  <img
-                    src={product.imagen || `https://placehold.co/600x400/EDE9FE/7C3AED?text=AVYNA`}
-                    alt={product.nombre}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                  <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <span className="bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold text-indigo-600 shadow-sm">
-                      {product.categoria}
-                    </span>
+            filteredProductos.map((product) => {
+              const presentation = formatProductPresentation(product);
+
+              return (
+                <motion.div
+                  key={product.id}
+                  whileHover={{ y: -6 }}
+                  className="card hover:shadow-xl transition-shadow duration-300 rounded-2xl overflow-hidden group"
+                >
+                  <div className="h-64 sm:h-72 bg-gradient-to-br from-violet-100 to-rose-100 flex items-center justify-center relative overflow-hidden">
+                    <img
+                      src={product.imagen || `https://placehold.co/600x400/EDE9FE/7C3AED?text=AVYNA`}
+                      alt={product.nombre}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                    <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <span className="bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold text-indigo-600 shadow-sm">
+                        {product.categoria}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="p-5">
-                  <div className="flex justify-between items-start gap-3">
-                    <h3 className="font-bold text-lg text-slate-800 leading-tight">{product.nombre}</h3>
-                    <span className="text-amber-500 font-bold text-sm bg-amber-50 px-1.5 rounded border border-amber-100 flex items-center h-fit">* {Number(product.rating || 4.8).toFixed(1)}</span>
+                  <div className="p-5">
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-lg text-slate-800 leading-tight">{product.nombre}</h3>
+                        {presentation && (
+                          <p className="mt-1 text-sm font-medium text-slate-500">{presentation}</p>
+                        )}
+                      </div>
+                      <span className="text-amber-500 font-bold text-sm bg-amber-50 px-1.5 rounded border border-amber-100 flex items-center h-fit">* {Number(product.rating || 4.8).toFixed(1)}</span>
+                    </div>
+                    <div className="mt-2 text-slate-500 font-medium">
+                      <span className="font-bold text-rose-600 text-xl">${Number(product.precio || 0).toFixed(2)}</span> <span className="text-xs">MXN</span>
+                    </div>
+                    <div className="mt-4 flex gap-3">
+                      <Link to={`/productos/${product.id}`} className="w-full">
+                        <Button className="w-full py-2.5">Ver detalle</Button>
+                      </Link>
+                    </div>
                   </div>
-                  <div className="mt-2 text-slate-500 font-medium">
-                    <span className="font-bold text-rose-600 text-xl">${Number(product.precio || 0).toFixed(2)}</span> <span className="text-xs">MXN</span>
-                  </div>
-                  <div className="mt-4 flex gap-3">
-                    <Link to={`/productos/${product.id}`} className="w-full">
-                      <Button className="w-full py-2.5">Ver detalle</Button>
-                    </Link>
-                  </div>
-                </div>
-              </motion.div>
-            ))
+                </motion.div>
+              );
+            })
           ) : (
             <div className="col-span-full text-center py-20 text-slate-400 font-medium bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
               <div className="mb-3 inline-flex items-center justify-center rounded-2xl bg-violet-50 p-3 text-violet-600">

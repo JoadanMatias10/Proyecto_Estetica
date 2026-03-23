@@ -4,6 +4,7 @@ import Button from "../../components/ui/Button";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import SidebarIcon from "../../components/ui/SidebarIcon";
 import { fetchPublicProductsBundle } from "../../utils/publicCatalogApi";
+import { formatProductPresentation } from "../../utils/productPresentation";
 
 export default function CatalogoProductos() {
   const [productos, setProductos] = useState([]);
@@ -163,56 +164,65 @@ export default function CatalogoProductos() {
           {isLoading ? (
             <div className="col-span-full h-[420px]" />
           ) : filteredProductos.length > 0 ? (
-            filteredProductos.map((product) => (
-              <div key={product.id} className="card hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group rounded-2xl overflow-hidden flex flex-col h-full border border-slate-100/50">
-                <div className="h-64 sm:h-72 bg-gradient-to-br from-violet-50 to-rose-50 relative overflow-hidden group-hover:from-violet-100 group-hover:to-rose-100 transition-colors duration-500">
-                  <img
-                    src={product.imagen || `https://placehold.co/800x500/F5F3FF/7C3AED?text=AVYNA`}
-                    alt={product.nombre}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-90 group-hover:opacity-100"
-                  />
-                  <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
-                    <span className="bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[10px] font-bold text-rose-500 shadow-sm border border-rose-100 text-center">
-                      {product.categoria}
-                    </span>
+            filteredProductos.map((product) => {
+              const presentation = formatProductPresentation(product);
+
+              return (
+                <div key={product.id} className="card hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group rounded-2xl overflow-hidden flex flex-col h-full border border-slate-100/50">
+                  <div className="h-64 sm:h-72 bg-gradient-to-br from-violet-50 to-rose-50 relative overflow-hidden group-hover:from-violet-100 group-hover:to-rose-100 transition-colors duration-500">
+                    <img
+                      src={product.imagen || `https://placehold.co/800x500/F5F3FF/7C3AED?text=AVYNA`}
+                      alt={product.nombre}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-90 group-hover:opacity-100"
+                    />
+                    <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
+                      <span className="bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[10px] font-bold text-rose-500 shadow-sm border border-rose-100 text-center">
+                        {product.categoria}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-5 flex-1 flex flex-col bg-white">
+                    <div className="flex justify-between gap-3 items-start mb-2">
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-slate-800 leading-tight text-lg line-clamp-2 min-h-[3.5rem] group-hover:text-violet-600 transition-colors">
+                          {product.nombre}
+                        </h3>
+                        {presentation && (
+                          <p className="mt-1 text-sm font-medium text-slate-500">{presentation}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100 shrink-0">
+                        <span className="text-xs">*</span>
+                        <span className="text-amber-600 font-bold text-xs">{Number(product.rating || 4.8).toFixed(1)}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-auto">
+                      <div className="text-slate-600 mb-4 font-medium flex items-baseline gap-1">
+                        <span className="font-bold text-2xl text-slate-900">${Number(product.precio || 0).toFixed(2)}</span>
+                        <span className="text-xs text-slate-400 font-normal">MXN</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <Link to={`/cliente/productos/${product.id}`} className="w-full">
+                          <Button
+                            variant="outline"
+                            className="w-full py-2.5 rounded-xl text-sm border-2 border-slate-100 hover:border-violet-200 hover:text-violet-600 hover:bg-violet-50 transition-all"
+                          >
+                            Detalle
+                          </Button>
+                        </Link>
+                        <Link to={`/cliente/productos/pago/${product.id}`} className="w-full">
+                          <Button className="w-full py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-violet-200 hover:shadow-lg hover:shadow-violet-300 transition-all transform hover:-translate-y-0.5">
+                            Comprar
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="p-5 flex-1 flex flex-col bg-white">
-                  <div className="flex justify-between gap-3 items-start mb-2">
-                    <h3 className="font-bold text-slate-800 leading-tight text-lg line-clamp-2 min-h-[3.5rem] group-hover:text-violet-600 transition-colors">
-                      {product.nombre}
-                    </h3>
-                    <div className="flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100 shrink-0">
-                      <span className="text-xs">*</span>
-                      <span className="text-amber-600 font-bold text-xs">{Number(product.rating || 4.8).toFixed(1)}</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-auto">
-                    <div className="text-slate-600 mb-4 font-medium flex items-baseline gap-1">
-                      <span className="font-bold text-2xl text-slate-900">${Number(product.precio || 0).toFixed(2)}</span>
-                      <span className="text-xs text-slate-400 font-normal">MXN</span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <Link to={`/cliente/productos/${product.id}`} className="w-full">
-                        <Button
-                          variant="outline"
-                          className="w-full py-2.5 rounded-xl text-sm border-2 border-slate-100 hover:border-violet-200 hover:text-violet-600 hover:bg-violet-50 transition-all"
-                        >
-                          Detalle
-                        </Button>
-                      </Link>
-                      <Link to={`/cliente/productos/pago/${product.id}`} className="w-full">
-                        <Button className="w-full py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-violet-200 hover:shadow-lg hover:shadow-violet-300 transition-all transform hover:-translate-y-0.5">
-                          Comprar
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <div className="col-span-full text-center py-20 text-slate-400 font-medium bg-slate-50/50 rounded-3xl border-2 border-dashed border-slate-200">
               <div className="mb-3 inline-flex items-center justify-center rounded-2xl bg-violet-50 p-3 text-violet-600">
