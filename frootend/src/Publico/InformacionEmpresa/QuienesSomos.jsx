@@ -48,12 +48,15 @@ export default function QuienesSomos() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
       <h1 className="page-title">Quienes somos</h1>
+
       {errorMessage ? (
         <p className="mt-3 text-red-600 text-sm">{errorMessage}</p>
       ) : (
-        <p className="text-slate-600 mt-3 leading-relaxed">
-          {companyInfo?.quienesSomosTexto}
-        </p>
+        <div className="card mt-6 p-7">
+          <p className="text-slate-600 leading-relaxed whitespace-pre-line">
+            {companyInfo?.quienesSomosTexto || "Informacion no disponible."}
+          </p>
+        </div>
       )}
 
       <div className="card mt-8 p-7">
@@ -64,13 +67,6 @@ export default function QuienesSomos() {
           ))}
           {esenciaItems.length === 0 && <li>- Informacion no disponible</li>}
         </ul>
-
-        <p className="text-sm text-slate-500 mt-6">
-          Quieres ver mision, vision y valores?{" "}
-          <Link className="font-semibold text-violet-600 hover:text-violet-700 transition-colors" to="/mision-vision-valores">
-            Ver aqui ->
-          </Link>
-        </p>
       </div>
     </div>
   );

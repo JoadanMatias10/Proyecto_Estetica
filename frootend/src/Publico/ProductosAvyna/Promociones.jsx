@@ -1,39 +1,45 @@
-import React from "react";
-import { Link } from "react-router-dom";
-import Button from "../../components/ui/Button";
-
-const promos = [
-  { titulo: "2x1 en Mascarilla", desc: "Válido de lunes a jueves.", badge: "LIMITADO" },
-  { titulo: "15% en Shampoo + Aceite", desc: "Combo para brillo y nutrición.", badge: "POPULAR" },
-  { titulo: "Envío gratis", desc: "En compras mayores a $499 MXN.", badge: "NUEVO" },
-];
+import React, { useEffect, useState } from "react";
+import LoadingSpinner from "../../components/ui/LoadingSpinner";
 
 export default function Promociones() {
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setIsLoading(false);
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, []);
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
       <div className="flex items-end justify-between gap-4 mb-10">
         <div>
           <h1 className="page-title">Promociones AVYNA</h1>
-          <p className="page-subtitle mt-2">Aprovecha descuentos y combos especiales.</p>
+          <p className="page-subtitle mt-2">Consulta promociones reales cuando esten disponibles.</p>
         </div>
-        <Link to="/productos" className="text-sm font-semibold text-violet-600 hover:text-violet-700 transition-colors">
-          Ir al catálogo →
-        </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {promos.map((p) => (
-          <div key={p.titulo} className="card card-hover p-7">
-            <div className="inline-flex text-xs font-bold px-3 py-1.5 rounded-full bg-gradient-to-r from-rose-400 to-violet-500 text-white shadow-sm">
-              {p.badge}
-            </div>
-            <h3 className="section-title mt-4">{p.titulo}</h3>
-            <p className="page-subtitle mt-2">{p.desc}</p>
-            <div className="mt-6">
-              <Button variant="outline" className="px-5 py-2.5 border-2">Aplicar</Button>
-            </div>
+      <div className={`relative ${isLoading ? "min-h-[320px]" : ""}`}>
+        {isLoading && (
+          <div className="absolute inset-0 z-10 flex items-start justify-center rounded-3xl bg-white/70 pt-20 backdrop-blur-sm sm:pt-24">
+            <LoadingSpinner
+              fullScreen={false}
+              className="py-6"
+              showText
+              text="Cargando promociones"
+              spinnerClassName="h-12 w-12 border-[3px] border-sky-200 border-t-blue-600"
+              textClassName="mt-4 text-base font-semibold text-blue-600 sm:text-lg"
+            />
           </div>
-        ))}
+        )}
+
+        <div className={`rounded-3xl border border-slate-200 bg-white/80 px-6 py-16 text-center shadow-sm transition-opacity duration-200 ${isLoading ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
+          <h2 className="text-2xl font-bold text-slate-800">No hay promociones publicas disponibles</h2>
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,14 @@
 const mongoose = require("mongoose");
 
+const serviceGalleryImageSchema = new mongoose.Schema(
+  {
+    url: { type: String, default: "" },
+    publicId: { type: String, default: "", trim: true },
+    nombre: { type: String, default: "", trim: true },
+  },
+  { _id: false }
+);
+
 const serviceSchema = new mongoose.Schema(
   {
     nombre: { type: String, required: true, trim: true },
@@ -11,6 +20,10 @@ const serviceSchema = new mongoose.Schema(
     imagen: { type: String, default: "" },
     imagenPublicId: { type: String, default: "", trim: true },
     imagenNombre: { type: String, default: "", trim: true },
+    galeriaImagenes: {
+      type: [serviceGalleryImageSchema],
+      default: () => [],
+    },
   },
   { timestamps: true, collection: "servicios" }
 );

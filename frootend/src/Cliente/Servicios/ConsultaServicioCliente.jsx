@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import Button from "../../components/ui/Button";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import SidebarIcon from "../../components/ui/SidebarIcon";
+import ServiceGalleryStrip from "../../components/services/ServiceGalleryStrip";
 import { fetchPublicServicesBundle, getServiceSubcategoriesBySegment } from "../../utils/publicCatalogApi";
 
 export default function ConsultaServicioCliente() {
@@ -229,6 +230,7 @@ export default function ConsultaServicioCliente() {
                   <div className="text-slate-700 font-medium mb-4">
                     Precio: <span className="font-bold text-2xl text-rose-600">${Number(service.precio || 0).toFixed(2)}</span> <span className="text-xs text-slate-400">MXN</span>
                   </div>
+                  <ServiceGalleryStrip service={service} />
 
                   <div className="mt-auto grid grid-cols-2 gap-2">
                     <Link to="/cliente/citas" className="w-full">

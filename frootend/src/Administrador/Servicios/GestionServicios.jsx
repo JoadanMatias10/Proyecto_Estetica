@@ -7,6 +7,7 @@ import { endpoints, requestJson } from "../../api";
 
 const FALLBACK_SEGMENTS = ["Mujer", "Hombre", "Nino"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const EXTRA_SERVICE_IMAGE_SLOTS = 3;
 
 function getAdminToken() {
   return localStorage.getItem("adminToken") || "";
@@ -21,6 +22,35 @@ function getSubcategoriesBySegment(records, segment) {
       .filter(Boolean)
   );
   return Array.from(unique);
+}
+
+function createEmptyGalleryImage() {
+  return {
+    imagen: "",
+    imagenNombre: "",
+  };
+}
+
+function getServiceGallerySlots(service) {
+  return Array.from({ length: EXTRA_SERVICE_IMAGE_SLOTS }, (_value, index) => {
+    const galleryImage = Array.isArray(service?.galeriaImagenes) ? service.galeriaImagenes[index] : null;
+    return {
+      imagen: galleryImage?.url || "",
+      imagenNombre: galleryImage?.nombre || "",
+    };
+  });
+}
+
+function getImageValidationMessage(file) {
+  if (!file.type.startsWith("image/")) {
+    return "Selecciona un archivo de imagen valido.";
+  }
+
+  if (file.size > MAX_IMAGE_BYTES) {
+    return "La imagen no puede pesar mas de 5 MB.";
+  }
+
+  return "";
 }
 
 function getDefaultFormValues(service = null, serviceCategories = []) {
@@ -42,11 +72,13 @@ function getDefaultFormValues(service = null, serviceCategories = []) {
     descripcion: service?.descripcion || "",
     imagen: service?.imagen || "",
     imagenNombre: service?.imagenNombre || "",
+    galeriaImagenes: getServiceGallerySlots(service),
   };
 }
 
 export default function GestionServicios() {
   const imageInputRef = useRef(null);
+  const galleryInputRefs = useRef([]);
   const [servicios, setServicios] = useState([]);
   const [serviceCategories, setServiceCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +86,9 @@ export default function GestionServicios() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentService, setCurrentService] = useState(null);
   const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [selectedGalleryFiles, setSelectedGalleryFiles] = useState(() =>
+    Array.from({ length: EXTRA_SERVICE_IMAGE_SLOTS }, () => null)
+  );
   const [formValues, setFormValues] = useState(getDefaultFormValues());
 
   const segments = useMemo(
@@ -97,17 +132,27 @@ export default function GestionServicios() {
     loadData();
   }, []);
 
+  const resetGalleryInputs = () => {
+    galleryInputRefs.current.forEach((input) => {
+      if (input) input.value = "";
+    });
+  };
+
   const openModal = (service = null) => {
     setCurrentService(service);
     setSelectedImageFile(null);
+    setSelectedGalleryFiles(Array.from({ length: EXTRA_SERVICE_IMAGE_SLOTS }, () => null));
     if (imageInputRef.current) imageInputRef.current.value = "";
+    resetGalleryInputs();
     setFormValues(getDefaultFormValues(service, serviceCategories));
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setSelectedImageFile(null);
+    setSelectedGalleryFiles(Array.from({ length: EXTRA_SERVICE_IMAGE_SLOTS }, () => null));
     if (imageInputRef.current) imageInputRef.current.value = "";
+    resetGalleryInputs();
     setIsModalOpen(false);
     setCurrentService(null);
     setFormValues(getDefaultFormValues(null, serviceCategories));
@@ -145,12 +190,9 @@ export default function GestionServicios() {
   const handleImageChange = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      window.alert("Selecciona un archivo de imagen valido.");
-      return;
-    }
-    if (file.size > MAX_IMAGE_BYTES) {
-      window.alert("La imagen no puede pesar mas de 5 MB.");
+    const validationMessage = getImageValidationMessage(file);
+    if (validationMessage) {
+      window.alert(validationMessage);
       if (imageInputRef.current) imageInputRef.current.value = "";
       return;
     }
@@ -168,6 +210,37 @@ export default function GestionServicios() {
     reader.readAsDataURL(file);
   };
 
+  const handleGalleryImageChange = (index, event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const validationMessage = getImageValidationMessage(file);
+    if (validationMessage) {
+      window.alert(validationMessage);
+      if (galleryInputRefs.current[index]) galleryInputRefs.current[index].value = "";
+      return;
+    }
+
+    setSelectedGalleryFiles((prev) =>
+      prev.map((currentFile, currentIndex) => (currentIndex === index ? file : currentFile))
+    );
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormValues((prev) => ({
+        ...prev,
+        galeriaImagenes: prev.galeriaImagenes.map((image, imageIndex) => (
+          imageIndex === index
+            ? {
+              imagen: reader.result?.toString() || "",
+              imagenNombre: file.name || "",
+            }
+            : image
+        )),
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleClearImage = () => {
     setSelectedImageFile(null);
     if (imageInputRef.current) imageInputRef.current.value = "";
@@ -175,6 +248,19 @@ export default function GestionServicios() {
       ...prev,
       imagen: currentService?.imagen || "",
       imagenNombre: currentService?.imagenNombre || "",
+    }));
+  };
+
+  const handleClearGalleryImage = (index) => {
+    setSelectedGalleryFiles((prev) =>
+      prev.map((currentFile, currentIndex) => (currentIndex === index ? null : currentFile))
+    );
+    if (galleryInputRefs.current[index]) galleryInputRefs.current[index].value = "";
+    setFormValues((prev) => ({
+      ...prev,
+      galeriaImagenes: prev.galeriaImagenes.map((image, imageIndex) => (
+        imageIndex === index ? createEmptyGalleryImage() : image
+      )),
     }));
   };
 
@@ -189,6 +275,9 @@ export default function GestionServicios() {
       return;
     }
 
+    const hasGalleryFileUploads = selectedGalleryFiles.some(Boolean);
+    const galleryActives = formValues.galeriaImagenes.map((image) => Boolean(image.imagen));
+
     const payloadBase = {
       nombre: formValues.nombre.trim(),
       segmento: formValues.segmento,
@@ -196,9 +285,10 @@ export default function GestionServicios() {
       precio: Number(formValues.precio),
       tiempo: formValues.tiempo.trim(),
       descripcion: formValues.descripcion.trim(),
+      galeriaImagenesActivas: JSON.stringify(galleryActives),
     };
 
-    const shouldUseFormData = Boolean(selectedImageFile) || !currentService;
+    const shouldUseFormData = Boolean(selectedImageFile) || hasGalleryFileUploads || !currentService;
     const payload = shouldUseFormData ? new FormData() : payloadBase;
 
     if (shouldUseFormData) {
@@ -209,6 +299,11 @@ export default function GestionServicios() {
       if (selectedImageFile) {
         payload.append("imagen", selectedImageFile);
       }
+
+      selectedGalleryFiles.forEach((file, index) => {
+        if (!file) return;
+        payload.append(`imagenSecundaria${index + 1}`, file);
+      });
     }
 
     setSubmitting(true);
@@ -462,6 +557,66 @@ export default function GestionServicios() {
                 <p className="text-xs text-slate-500">Vista previa</p>
               </div>
             )}
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <label className="form-label">Imagenes adicionales del servicio</label>
+              <p className="text-xs text-slate-500 mt-1">
+                Puedes cargar hasta 3 imagenes extra para mostrarlas debajo del detalle del servicio.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {formValues.galeriaImagenes.map((image, index) => (
+                <div key={`galeria-servicio-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">Imagen adicional {index + 1}</p>
+                    <p className="text-xs text-slate-500 mt-1">Opcional</p>
+                  </div>
+                  <div className="rounded-xl border-2 border-dashed border-slate-200 bg-white p-3 flex flex-wrap items-center gap-3">
+                    <label
+                      htmlFor={`imagen-servicio-extra-${index}`}
+                      className="inline-flex items-center px-3 py-2 rounded-lg bg-indigo-100 text-indigo-700 text-sm font-semibold cursor-pointer hover:bg-indigo-200 transition-colors"
+                    >
+                      Elegir imagen
+                    </label>
+                    <span className="text-sm text-slate-500 truncate">
+                      {image.imagenNombre || (image.imagen ? "Imagen cargada" : "Sin imagen")}
+                    </span>
+                    {image.imagen && (
+                      <button
+                        type="button"
+                        onClick={() => handleClearGalleryImage(index)}
+                        className="ml-auto text-xs font-semibold text-rose-600 hover:text-rose-700"
+                      >
+                        Quitar
+                      </button>
+                    )}
+                    <input
+                      id={`imagen-servicio-extra-${index}`}
+                      ref={(node) => {
+                        galleryInputRefs.current[index] = node;
+                      }}
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => handleGalleryImageChange(index, event)}
+                      className="sr-only"
+                    />
+                  </div>
+                  {image.imagen ? (
+                    <img
+                      src={image.imagen}
+                      alt={`Preview adicional ${index + 1}`}
+                      className="h-28 w-full rounded-xl object-cover border border-slate-200 shadow-sm"
+                    />
+                  ) : (
+                    <div className="h-28 rounded-xl border border-dashed border-slate-200 bg-white flex items-center justify-center text-xs text-slate-400">
+                      Sin vista previa
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="pt-4 flex justify-end gap-3">

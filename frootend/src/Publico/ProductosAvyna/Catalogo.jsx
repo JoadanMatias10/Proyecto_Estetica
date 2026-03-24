@@ -108,10 +108,6 @@ export default function Catalogo() {
               className="search-input"
             />
           </div>
-
-          <Link to="/promociones" className="text-sm font-semibold text-violet-600 hover:text-violet-700 transition-colors whitespace-nowrap">
-            Ver promociones ->
-          </Link>
         </div>
       </div>
 

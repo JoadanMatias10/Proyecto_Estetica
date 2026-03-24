@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import Button from "../../components/ui/Button";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import SidebarIcon from "../../components/ui/SidebarIcon";
+import ServiceGalleryStrip from "../../components/services/ServiceGalleryStrip";
 import { fetchPublicServicesBundle, getServiceSubcategoriesBySegment } from "../../utils/publicCatalogApi";
 
 export default function ConsultaServicio() {
@@ -227,6 +228,7 @@ export default function ConsultaServicio() {
                   <div className="mt-1 text-slate-700">
                     Desde <span className="font-bold text-rose-600 text-xl">${Number(service.precio || 0).toFixed(2)}</span> <span className="text-xs">MXN</span>
                   </div>
+                  <ServiceGalleryStrip service={service} />
                   <div className="mt-5">
                     <Link to="/login">
                       <Button variant="outline" className="w-full py-2.5 border-2 rounded-xl">

@@ -73,6 +73,15 @@ const PRESENTATION_UNIT_IMPORT_KEYS = [
 const excelUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 const CLOUDINARY_UNAVAILABLE_MESSAGE =
   "La carga de imagenes no esta disponible. Configura CLOUDINARY_NAME, CLOUDINARY_KEY y CLOUDINARY_SECRET en el servidor.";
+const SERVICE_GALLERY_FIELD_NAMES = [
+  "imagenSecundaria1",
+  "imagenSecundaria2",
+  "imagenSecundaria3",
+];
+const SERVICE_IMAGE_UPLOAD_FIELDS = [
+  { name: "imagen", maxCount: 1 },
+  ...SERVICE_GALLERY_FIELD_NAMES.map((fieldName) => ({ name: fieldName, maxCount: 1 })),
+];
 
 function isDataUrlImage(value) {
   return /^data:image\//i.test(String(value || "").trim());
@@ -96,6 +105,11 @@ async function cleanupUploadedCloudinaryImage(uploadedImage) {
   const uploadedPublicId = sanitizeText(uploadedImage?.filename || uploadedImage?.public_id);
   if (!uploadedPublicId) return;
   await destroyCloudinaryImage(uploadedPublicId);
+}
+
+async function cleanupUploadedCloudinaryImages(uploadedImages) {
+  const uploads = Array.isArray(uploadedImages) ? uploadedImages.filter(Boolean) : [];
+  await Promise.all(uploads.map((uploadedImage) => cleanupUploadedCloudinaryImage(uploadedImage)));
 }
 
 function requireCloudinaryUploadSupport(req, res, next) {
@@ -155,6 +169,60 @@ function pickImportValue(row, keys) {
   }
 
   return "";
+}
+
+function getFirstUploadedFile(files, fieldName) {
+  const matches = files?.[fieldName];
+  return Array.isArray(matches) ? matches[0] : null;
+}
+
+function buildEmptyServiceGallerySlot() {
+  return {
+    url: "",
+    publicId: "",
+    nombre: "",
+  };
+}
+
+function normalizeServiceGallerySlots(gallery) {
+  return SERVICE_GALLERY_FIELD_NAMES.map((_fieldName, index) => {
+    const slot = Array.isArray(gallery) ? gallery[index] : null;
+    return {
+      url: sanitizeText(slot?.url),
+      publicId: sanitizeText(slot?.publicId),
+      nombre: sanitizeText(slot?.nombre),
+    };
+  });
+}
+
+function mapUploadedServiceImage(uploadedImage) {
+  return {
+    url: sanitizeText(uploadedImage?.path),
+    publicId: sanitizeText(uploadedImage?.filename || uploadedImage?.public_id),
+    nombre: sanitizeText(uploadedImage?.originalname),
+  };
+}
+
+function parseServiceGalleryActives(value, fallback = SERVICE_GALLERY_FIELD_NAMES.map(() => false)) {
+  if (Array.isArray(value)) {
+    return SERVICE_GALLERY_FIELD_NAMES.map((_fieldName, index) => Boolean(value[index]));
+  }
+
+  const normalized = sanitizeText(value);
+  if (!normalized) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(normalized);
+    if (Array.isArray(parsed)) {
+      return SERVICE_GALLERY_FIELD_NAMES.map((_fieldName, index) => Boolean(parsed[index]));
+    }
+  } catch (_error) {
+    return fallback;
+  }
+
+  return fallback;
 }
 
 function normalizeProductPresentationFields({ cantidadMedida, unidadMedida }) {
@@ -817,8 +885,11 @@ router.get("/services", async (_req, res) => {
   return res.json({ services: services.map(mapId) });
 });
 
-router.post("/services", requireCloudinaryUploadSupport, serviceUpload.single("imagen"), async (req, res) => {
-  const uploadedImage = req.file;
+router.post("/services", requireCloudinaryUploadSupport, serviceUpload.fields(SERVICE_IMAGE_UPLOAD_FIELDS), async (req, res) => {
+  const uploadedImage = getFirstUploadedFile(req.files, "imagen");
+  const uploadedGalleryImages = SERVICE_GALLERY_FIELD_NAMES.map((fieldName) =>
+    getFirstUploadedFile(req.files, fieldName)
+  );
   const nombre = sanitizeText(req.body.nombre);
   const segmento = sanitizeSegment(req.body.segmento);
   const subcategoria = sanitizeText(req.body.subcategoria);
@@ -843,9 +914,16 @@ router.post("/services", requireCloudinaryUploadSupport, serviceUpload.single("i
   }
 
   if (errors.length) {
-    await cleanupUploadedCloudinaryImage(uploadedImage);
+    await cleanupUploadedCloudinaryImages([uploadedImage, ...uploadedGalleryImages]);
     return res.status(400).json({ errors });
   }
+
+  const galeriaImagenes = SERVICE_GALLERY_FIELD_NAMES.map((_fieldName, index) => {
+    const uploadedGalleryImage = uploadedGalleryImages[index];
+    return uploadedGalleryImage?.path
+      ? mapUploadedServiceImage(uploadedGalleryImage)
+      : buildEmptyServiceGallerySlot();
+  });
 
   try {
     const service = await Service.create({
@@ -858,26 +936,30 @@ router.post("/services", requireCloudinaryUploadSupport, serviceUpload.single("i
       imagen,
       imagenPublicId,
       imagenNombre,
+      galeriaImagenes,
     });
 
     return res.status(201).json({ service: mapId(service.toObject()) });
   } catch (error) {
-    await cleanupUploadedCloudinaryImage(uploadedImage);
+    await cleanupUploadedCloudinaryImages([uploadedImage, ...uploadedGalleryImages]);
     throw error;
   }
 });
 
-router.put("/services/:id", requireCloudinaryUploadSupport, serviceUpload.single("imagen"), async (req, res) => {
-  const uploadedImage = req.file;
+router.put("/services/:id", requireCloudinaryUploadSupport, serviceUpload.fields(SERVICE_IMAGE_UPLOAD_FIELDS), async (req, res) => {
+  const uploadedImage = getFirstUploadedFile(req.files, "imagen");
+  const uploadedGalleryImages = SERVICE_GALLERY_FIELD_NAMES.map((fieldName) =>
+    getFirstUploadedFile(req.files, fieldName)
+  );
   const { id } = req.params;
   if (!isValidId(id)) {
-    await cleanupUploadedCloudinaryImage(uploadedImage);
+    await cleanupUploadedCloudinaryImages([uploadedImage, ...uploadedGalleryImages]);
     return res.status(400).json({ errors: ["Servicio invalido."] });
   }
 
   const current = await Service.findById(id);
   if (!current) {
-    await cleanupUploadedCloudinaryImage(uploadedImage);
+    await cleanupUploadedCloudinaryImages([uploadedImage, ...uploadedGalleryImages]);
     return res.status(404).json({ errors: ["Servicio no encontrado."] });
   }
 
@@ -890,6 +972,11 @@ router.put("/services/:id", requireCloudinaryUploadSupport, serviceUpload.single
   const imagenNombre = sanitizeText(uploadedImage?.originalname || req.body.imagenNombre);
   const tiempo = sanitizeText(req.body.tiempo);
   const precio = parsePositiveNumber(req.body.precio, NaN);
+  const currentGallerySlots = normalizeServiceGallerySlots(current.galeriaImagenes);
+  const galleryActives = parseServiceGalleryActives(
+    req.body.galeriaImagenesActivas,
+    currentGallerySlots.map((slot) => Boolean(slot.url))
+  );
 
   const errors = [];
   if (!nombre) errors.push("Nombre de servicio es obligatorio.");
@@ -904,11 +991,25 @@ router.put("/services/:id", requireCloudinaryUploadSupport, serviceUpload.single
   }
 
   if (errors.length) {
-    await cleanupUploadedCloudinaryImage(uploadedImage);
+    await cleanupUploadedCloudinaryImages([uploadedImage, ...uploadedGalleryImages]);
     return res.status(400).json({ errors });
   }
 
   const previousImagePublicId = sanitizeText(current.imagenPublicId);
+  const nextGallerySlots = SERVICE_GALLERY_FIELD_NAMES.map((_fieldName, index) => {
+    const uploadedGalleryImage = uploadedGalleryImages[index];
+    const currentGallerySlot = currentGallerySlots[index];
+
+    if (uploadedGalleryImage?.path) {
+      return mapUploadedServiceImage(uploadedGalleryImage);
+    }
+
+    if (galleryActives[index] && currentGallerySlot.url) {
+      return currentGallerySlot;
+    }
+
+    return buildEmptyServiceGallerySlot();
+  });
 
   try {
     current.nombre = nombre;
@@ -917,6 +1018,7 @@ router.put("/services/:id", requireCloudinaryUploadSupport, serviceUpload.single
     current.precio = precio;
     current.tiempo = tiempo;
     current.descripcion = descripcion;
+    current.galeriaImagenes = nextGallerySlots;
 
     if (uploadedImage?.path) {
       current.imagen = imagen;
@@ -930,13 +1032,28 @@ router.put("/services/:id", requireCloudinaryUploadSupport, serviceUpload.single
 
     await current.save();
 
+    const imagesToDelete = [];
     if (uploadedImage?.path && previousImagePublicId && previousImagePublicId !== imagenPublicId) {
-      await destroyCloudinaryImage(previousImagePublicId);
+      imagesToDelete.push(previousImagePublicId);
     }
+    currentGallerySlots.forEach((slot, index) => {
+      const nextSlot = nextGallerySlots[index];
+      if (!slot.publicId) return;
+
+      if (uploadedGalleryImages[index]?.path && slot.publicId !== nextSlot.publicId) {
+        imagesToDelete.push(slot.publicId);
+        return;
+      }
+
+      if (!nextSlot.publicId) {
+        imagesToDelete.push(slot.publicId);
+      }
+    });
+    await Promise.all(imagesToDelete.map((publicId) => destroyCloudinaryImage(publicId)));
 
     return res.json({ service: mapId(current.toObject()) });
   } catch (error) {
-    await cleanupUploadedCloudinaryImage(uploadedImage);
+    await cleanupUploadedCloudinaryImages([uploadedImage, ...uploadedGalleryImages]);
     throw error;
   }
 });
@@ -951,7 +1068,13 @@ router.delete("/services/:id", async (req, res) => {
   if (!deleted) {
     return res.status(404).json({ errors: ["Servicio no encontrado."] });
   }
-  await destroyCloudinaryImage(deleted.imagenPublicId);
+  const galleryPublicIds = normalizeServiceGallerySlots(deleted.galeriaImagenes)
+    .map((slot) => slot.publicId)
+    .filter(Boolean);
+  await Promise.all([
+    destroyCloudinaryImage(deleted.imagenPublicId),
+    ...galleryPublicIds.map((publicId) => destroyCloudinaryImage(publicId)),
+  ]);
   return res.json({ message: "Servicio eliminado." });
 });
 
