@@ -19,6 +19,7 @@ function getCategoryNames(records) {
 }
 
 const PRESENTATION_UNITS = [
+  { value: "", label: "Sin presentacion" },
   { value: "ml", label: "Mililitros (ml)" },
   { value: "g", label: "Gramos (g)" },
 ];
@@ -38,7 +39,7 @@ function getDefaultPresentationQuantity(unit) {
   const options = PRESENTATION_QUANTITIES[unit];
   const preferred = DEFAULT_PRESENTATION_QUANTITY[unit];
   if (options?.includes(preferred)) return preferred;
-  return options?.[0] ?? 0;
+  return options?.[0] ?? "";
 }
 
 const getDefaultFormValues = (product, categories, brands) => {
@@ -49,10 +50,10 @@ const getDefaultFormValues = (product, categories, brands) => {
   const unitFromProduct = String(product?.unidadMedida || "").toLowerCase();
   const unidadMedida = PRESENTATION_UNITS.some((unit) => unit.value === unitFromProduct)
     ? unitFromProduct
-    : PRESENTATION_UNITS[0].value;
+    : "";
 
   const parsedCantidad = Number(product?.cantidadMedida);
-  const cantidadMedida = Number.isFinite(parsedCantidad) && parsedCantidad > 0
+  const cantidadMedida = unidadMedida && Number.isFinite(parsedCantidad) && parsedCantidad > 0
     ? parsedCantidad
     : getDefaultPresentationQuantity(unidadMedida);
 
@@ -66,7 +67,7 @@ const getDefaultFormValues = (product, categories, brands) => {
     imagen: product?.imagen || "",
     imagenNombre: product?.imagenNombre || "",
     unidadMedida,
-    cantidadMedida: String(cantidadMedida),
+    cantidadMedida: cantidadMedida ? String(cantidadMedida) : "",
   };
 };
 
@@ -97,6 +98,7 @@ export default function CatalogoProductosAdmin() {
     return [...brands, formValues.marca];
   }, [brands, formValues.marca]);
   const availablePresentationQuantities = useMemo(() => {
+    if (!formValues.unidadMedida) return [];
     const baseOptions = PRESENTATION_QUANTITIES[formValues.unidadMedida] || [];
     const currentQuantity = Number(formValues.cantidadMedida);
     if (!Number.isFinite(currentQuantity) || baseOptions.includes(currentQuantity)) {
@@ -176,7 +178,7 @@ export default function CatalogoProductosAdmin() {
       setFormValues((prev) => ({
         ...prev,
         unidadMedida: value,
-        cantidadMedida: String(nextQuantity),
+        cantidadMedida: nextQuantity ? String(nextQuantity) : "",
       }));
       return;
     }
@@ -295,6 +297,7 @@ export default function CatalogoProductosAdmin() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    const hasPresentation = Boolean(formValues.unidadMedida);
 
     if (!formValues.categoria) {
       window.alert("Selecciona una categoria valida.");
@@ -304,8 +307,8 @@ export default function CatalogoProductosAdmin() {
       window.alert("Selecciona una marca valida.");
       return;
     }
-    if (!formValues.unidadMedida || !formValues.cantidadMedida) {
-      window.alert("Selecciona cantidad y unidad de presentacion.");
+    if (hasPresentation && !formValues.cantidadMedida) {
+      window.alert("Selecciona una cantidad de presentacion valida.");
       return;
     }
     if (!currentProduct && !selectedImageFile) {
@@ -320,7 +323,7 @@ export default function CatalogoProductosAdmin() {
       stock: Number(formValues.stock),
       categoria: formValues.categoria,
       descripcion: formValues.descripcion.trim(),
-      cantidadMedida: Number(formValues.cantidadMedida),
+      cantidadMedida: hasPresentation ? Number(formValues.cantidadMedida) : "",
       unidadMedida: formValues.unidadMedida,
       rating: currentProduct?.rating || 4.8,
     };
@@ -606,12 +609,11 @@ export default function CatalogoProductosAdmin() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="form-label">Unidad</label>
+              <label className="form-label">Presentacion</label>
               <select
                 name="unidadMedida"
                 value={formValues.unidadMedida}
                 onChange={handleInputChange}
-                required
                 className="form-input"
               >
                 {PRESENTATION_UNITS.map((unit) => (
@@ -619,22 +621,27 @@ export default function CatalogoProductosAdmin() {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="form-label">Cantidad</label>
-              <select
-                name="cantidadMedida"
-                value={formValues.cantidadMedida}
-                onChange={handleInputChange}
-                required
-                className="form-input"
-              >
-                {availablePresentationQuantities.map((quantity) => (
-                  <option key={`${formValues.unidadMedida}-${quantity}`} value={String(quantity)}>
-                    {quantity}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {formValues.unidadMedida ? (
+              <div>
+                <label className="form-label">Cantidad</label>
+                <select
+                  name="cantidadMedida"
+                  value={formValues.cantidadMedida}
+                  onChange={handleInputChange}
+                  className="form-input"
+                >
+                  {availablePresentationQuantities.map((quantity) => (
+                    <option key={`${formValues.unidadMedida}-${quantity}`} value={String(quantity)}>
+                      {quantity}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 self-end">
+                Este producto no mostrara cantidad ni unidad de presentacion.
+              </div>
+            )}
           </div>
           <div>
             <label className="form-label">Descripcion</label>

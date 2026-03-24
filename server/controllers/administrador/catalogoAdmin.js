@@ -53,7 +53,21 @@ const EXCEL_PRODUCT_COLUMNS = [
   "categoria",
   "precio",
   "stock",
+  "cantidad_presentacion",
+  "unidad_presentacion",
   "acciones",
+];
+const PRESENTATION_QUANTITY_IMPORT_KEYS = [
+  "cantidad_presentacion",
+  "cantidad_medida",
+  "cantidad de presentacion",
+  "cantidad de medida",
+];
+const PRESENTATION_UNIT_IMPORT_KEYS = [
+  "unidad_presentacion",
+  "unidad_medida",
+  "unidad de presentacion",
+  "unidad de medida",
 ];
 
 const excelUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
@@ -141,6 +155,32 @@ function pickImportValue(row, keys) {
   }
 
   return "";
+}
+
+function normalizeProductPresentationFields({ cantidadMedida, unidadMedida }) {
+  const rawQuantity = sanitizeText(cantidadMedida);
+  const rawUnit = sanitizeText(unidadMedida).toLowerCase();
+  const normalizedUnit = sanitizeProductUnit(rawUnit);
+  const normalizedQuantity = rawQuantity ? parsePositiveNumber(rawQuantity, NaN) : null;
+  const errors = [];
+
+  if (rawUnit && !normalizedUnit) {
+    errors.push("Unidad de medida invalida.");
+  }
+
+  if (normalizedUnit && (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0)) {
+    errors.push("Cantidad de medida invalida.");
+  }
+
+  if (!rawUnit && rawQuantity) {
+    errors.push("La cantidad de medida requiere una unidad de medida valida.");
+  }
+
+  return {
+    cantidadMedida: normalizedUnit ? normalizedQuantity : undefined,
+    unidadMedida: normalizedUnit || "",
+    errors,
+  };
 }
 
 router.get("/product-categories", async (_req, res) => {
@@ -330,6 +370,11 @@ router.get("/products/export", async (_req, res) => {
     categoria: product.categoria || "",
     precio: Number(product.precio || 0),
     stock: Number(product.stock || 0),
+    cantidad_presentacion:
+      Number.isFinite(Number(product.cantidadMedida)) && Number(product.cantidadMedida) > 0
+        ? Number(product.cantidadMedida)
+        : "",
+    unidad_presentacion: product.unidadMedida || "",
     acciones: "",
   }));
 
@@ -381,6 +426,16 @@ router.post("/products/import", excelUpload.single("archivo"), async (req, res) 
   }
 
   try {
+    const normalizedHeaders = new Set();
+    rows.forEach((row) => {
+      Object.keys(row || {}).forEach((key) => {
+        normalizedHeaders.add(normalizeImportHeader(key));
+      });
+    });
+    const importIncludesPresentation =
+      [...PRESENTATION_QUANTITY_IMPORT_KEYS, ...PRESENTATION_UNIT_IMPORT_KEYS]
+        .some((header) => normalizedHeaders.has(normalizeImportHeader(header)));
+
     const categoryNames = await ProductCategory.find().select("nombre").lean();
     const brandNames = await ProductBrand.find().select("nombre").lean();
     const categoryMap = new Map(
@@ -407,6 +462,13 @@ router.post("/products/import", excelUpload.single("archivo"), async (req, res) 
       const imagen = normalizeImportText(pickImportValue(row, ["imagen", "image"]));
       const precio = normalizeImportNumber(pickImportValue(row, ["precio", "price"]));
       const stock = normalizeImportNumber(pickImportValue(row, ["stock", "existencias", "cantidad"]));
+      const presentation =
+        importIncludesPresentation
+          ? normalizeProductPresentationFields({
+            cantidadMedida: pickImportValue(row, PRESENTATION_QUANTITY_IMPORT_KEYS),
+            unidadMedida: pickImportValue(row, PRESENTATION_UNIT_IMPORT_KEYS),
+          })
+          : { cantidadMedida: undefined, unidadMedida: "", errors: [] };
       const marcaLookup = normalizeCatalogLookup(marcaRaw);
       const categoriaLookup = normalizeCatalogLookup(categoriaRaw);
       const marca = brandMap.get(marcaLookup) || marcaRaw;
@@ -422,6 +484,7 @@ router.post("/products/import", excelUpload.single("archivo"), async (req, res) 
       if (!categoryMap.has(categoriaLookup)) rowErrors.push("La categoria no existe.");
       if (!brandMap.has(marcaLookup)) rowErrors.push("La marca no existe.");
       if (processedKeys.has(importKey)) rowErrors.push("Producto duplicado dentro del mismo archivo.");
+      rowErrors.push(...presentation.errors);
 
       if (rowErrors.length) {
         errors.push(`Fila ${line}: ${rowErrors.join(" ")}`);
@@ -437,6 +500,11 @@ router.post("/products/import", excelUpload.single("archivo"), async (req, res) 
         stock,
         categoria,
       };
+
+      if (importIncludesPresentation) {
+        productData.cantidadMedida = presentation.cantidadMedida;
+        productData.unidadMedida = presentation.unidadMedida;
+      }
 
       if (imagen) {
         productData.imagen = imagen;
@@ -485,8 +553,11 @@ router.post("/products", requireCloudinaryUploadSupport, upload.single("imagen")
   const imagenNombre = sanitizeText(uploadedImage?.originalname || req.body.imagenNombre);
   const precio = parsePositiveNumber(req.body.precio, NaN);
   const stock = parsePositiveNumber(req.body.stock, NaN);
-  const cantidadMedida = parsePositiveNumber(req.body.cantidadMedida, NaN);
-  const unidadMedida = sanitizeProductUnit(req.body.unidadMedida);
+  const presentation = normalizeProductPresentationFields({
+    cantidadMedida: req.body.cantidadMedida,
+    unidadMedida: req.body.unidadMedida,
+  });
+  const { cantidadMedida, unidadMedida } = presentation;
   const rating = parsePositiveNumber(req.body.rating, 4.8);
 
   const errors = [];
@@ -495,8 +566,7 @@ router.post("/products", requireCloudinaryUploadSupport, upload.single("imagen")
   if (!categoria) errors.push("Categoria es obligatoria.");
   if (!Number.isFinite(precio)) errors.push("Precio invalido.");
   if (!Number.isFinite(stock)) errors.push("Stock invalido.");
-  if (!Number.isFinite(cantidadMedida) || cantidadMedida <= 0) errors.push("Cantidad de medida invalida.");
-  if (!unidadMedida) errors.push("Unidad de medida invalida.");
+  errors.push(...presentation.errors);
   if (!imagen) errors.push("La imagen del producto es obligatoria.");
   if (isDataUrlImage(imagen)) errors.push("La imagen debe enviarse como archivo o URL valida, no en base64.");
 
@@ -559,8 +629,11 @@ router.put("/products/:id", requireCloudinaryUploadSupport, upload.single("image
   const imagenNombre = sanitizeText(uploadedImage?.originalname || req.body.imagenNombre);
   const precio = parsePositiveNumber(req.body.precio, NaN);
   const stock = parsePositiveNumber(req.body.stock, NaN);
-  const cantidadMedida = parsePositiveNumber(req.body.cantidadMedida, NaN);
-  const unidadMedida = sanitizeProductUnit(req.body.unidadMedida);
+  const presentation = normalizeProductPresentationFields({
+    cantidadMedida: req.body.cantidadMedida,
+    unidadMedida: req.body.unidadMedida,
+  });
+  const { cantidadMedida, unidadMedida } = presentation;
   const rating = parsePositiveNumber(req.body.rating, current.rating || 4.8);
 
   const errors = [];
@@ -569,8 +642,7 @@ router.put("/products/:id", requireCloudinaryUploadSupport, upload.single("image
   if (!categoria) errors.push("Categoria es obligatoria.");
   if (!Number.isFinite(precio)) errors.push("Precio invalido.");
   if (!Number.isFinite(stock)) errors.push("Stock invalido.");
-  if (!Number.isFinite(cantidadMedida) || cantidadMedida <= 0) errors.push("Cantidad de medida invalida.");
-  if (!unidadMedida) errors.push("Unidad de medida invalida.");
+  errors.push(...presentation.errors);
   if (isDataUrlImage(imagen)) errors.push("La imagen debe enviarse como archivo o URL valida, no en base64.");
 
   const category = await ProductCategory.findOne({ nombre: categoria });
