@@ -5,9 +5,13 @@ import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import SidebarIcon from "../../components/ui/SidebarIcon";
 import { endpoints, requestJson } from "../../api";
 
-const FALLBACK_SEGMENTS = ["Mujer", "Hombre", "Nino"];
+const FALLBACK_SEGMENTS = ["Dama", "Caballero", "Niño"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const EXTRA_SERVICE_IMAGE_SLOTS = 3;
+const TIME_UNIT_OPTIONS = [
+  { value: "minutos", label: "Minutos" },
+  { value: "horas", label: "Horas" },
+];
 
 function getAdminToken() {
   return localStorage.getItem("adminToken") || "";
@@ -53,6 +57,40 @@ function getImageValidationMessage(file) {
   return "";
 }
 
+function normalizeTimeUnit(unit = "") {
+  return /hora|hr|hrs|^h$/.test(unit) ? "horas" : "minutos";
+}
+
+function parseEstimatedTime(time = "") {
+  const originalTime = String(time || "").trim();
+  if (!originalTime) {
+    return {
+      cantidad: "",
+      unidad: "minutos",
+      textoOriginal: "",
+    };
+  }
+
+  const normalizedTime = originalTime.toLowerCase();
+  const numberMatch = normalizedTime.match(/(\d+(?:[.,]\d+)?)/);
+  const unitMatch = normalizedTime.match(/min(?:uto)?s?|hora?s?|hrs?|^h$/);
+
+  return {
+    cantidad: numberMatch ? numberMatch[1].replace(",", ".") : "",
+    unidad: normalizeTimeUnit(unitMatch?.[0] || ""),
+    textoOriginal: originalTime,
+  };
+}
+
+function formatEstimatedTime(amount, unit) {
+  const normalizedAmount = String(amount || "").trim();
+  if (!normalizedAmount) return "";
+  const normalizedUnit = normalizeTimeUnit(unit);
+  const numericAmount = Number(normalizedAmount);
+  const displayUnit = numericAmount === 1 ? normalizedUnit.replace(/s$/, "") : normalizedUnit;
+  return `${normalizedAmount} ${displayUnit}`;
+}
+
 function getDefaultFormValues(service = null, serviceCategories = []) {
   const segments = Array.from(
     new Set([
@@ -62,17 +100,22 @@ function getDefaultFormValues(service = null, serviceCategories = []) {
   );
   const segmento = service?.segmento || segments[0];
   const subcategories = getSubcategoriesBySegment(serviceCategories, segmento);
+  const estimatedTime = parseEstimatedTime(service?.tiempo);
 
   return {
     nombre: service?.nombre || "",
     segmento,
     subcategoria: service?.subcategoria || subcategories[0] || "",
     precio: service?.precio ?? "",
-    tiempo: service?.tiempo || "",
+    tiempoCantidad: estimatedTime.cantidad,
+    tiempoUnidad: estimatedTime.unidad,
+    tiempoOriginal: estimatedTime.textoOriginal,
+    tiempoEditado: false,
     descripcion: service?.descripcion || "",
     imagen: service?.imagen || "",
     imagenNombre: service?.imagenNombre || "",
     galeriaImagenes: getServiceGallerySlots(service),
+    destacadoInicio: Boolean(service?.destacadoInicio),
   };
 }
 
@@ -172,19 +215,29 @@ export default function GestionServicios() {
   };
 
   const handleInputChange = (event) => {
-    const { name, value } = event.target;
+    const { name, value, type, checked } = event.target;
+    const nextValue = type === "checkbox" ? checked : value;
 
     if (name === "segmento") {
-      const subcategories = getSubcategoriesBySegment(serviceCategories, value);
+      const subcategories = getSubcategoriesBySegment(serviceCategories, nextValue);
       setFormValues((prev) => ({
         ...prev,
-        segmento: value,
+        segmento: nextValue,
         subcategoria: subcategories.includes(prev.subcategoria) ? prev.subcategoria : (subcategories[0] || ""),
       }));
       return;
     }
 
-    setFormValues((prev) => ({ ...prev, [name]: value }));
+    if (name === "tiempoCantidad" || name === "tiempoUnidad") {
+      setFormValues((prev) => ({
+        ...prev,
+        [name]: nextValue,
+        tiempoEditado: true,
+      }));
+      return;
+    }
+
+    setFormValues((prev) => ({ ...prev, [name]: nextValue }));
   };
 
   const handleImageChange = (event) => {
@@ -266,8 +319,16 @@ export default function GestionServicios() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    const estimatedTime = formValues.tiempoEditado
+      ? formatEstimatedTime(formValues.tiempoCantidad, formValues.tiempoUnidad)
+      : (formValues.tiempoOriginal || formatEstimatedTime(formValues.tiempoCantidad, formValues.tiempoUnidad));
+
     if (!formValues.subcategoria) {
       window.alert("Selecciona una subcategoria valida.");
+      return;
+    }
+    if (!estimatedTime) {
+      window.alert("Selecciona un tiempo estimado valido.");
       return;
     }
     if (!currentService && !selectedImageFile) {
@@ -283,9 +344,10 @@ export default function GestionServicios() {
       segmento: formValues.segmento,
       subcategoria: formValues.subcategoria,
       precio: Number(formValues.precio),
-      tiempo: formValues.tiempo.trim(),
+      tiempo: estimatedTime,
       descripcion: formValues.descripcion.trim(),
       galeriaImagenesActivas: JSON.stringify(galleryActives),
+      destacadoInicio: formValues.destacadoInicio,
     };
 
     const shouldUseFormData = Boolean(selectedImageFile) || hasGalleryFileUploads || !currentService;
@@ -383,7 +445,9 @@ export default function GestionServicios() {
                   <tr key={service.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4 font-medium text-slate-900">
                       <div>{service.nombre}</div>
-                      <div className="text-xs text-slate-400 font-normal">{service.descripcion}</div>
+                      <div className="text-xs text-slate-400 font-normal truncate max-w-xs">
+                        {service.descripcion}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       {service.imagen ? (
@@ -404,23 +468,25 @@ export default function GestionServicios() {
                     </td>
                     <td className="px-6 py-4 font-semibold text-slate-900">${Number(service.precio || 0).toFixed(2)}</td>
                     <td className="px-6 py-4">{service.tiempo}</td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => openModal(service)}
-                        className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-orange-200 bg-white text-orange-500 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 transition-colors shadow-sm"
-                        aria-label="Editar servicio"
-                      >
-                        <SidebarIcon name="edit" className="h-5 w-5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(service.id)}
-                        className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-red-200 bg-white text-red-500 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors shadow-sm"
-                        aria-label="Eliminar servicio"
-                      >
-                        <SidebarIcon name="delete" className="h-5 w-5" />
-                      </button>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => openModal(service)}
+                          className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-orange-200 bg-white text-orange-500 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 transition-colors shadow-sm"
+                          aria-label="Editar servicio"
+                        >
+                          <SidebarIcon name="edit" className="h-5 w-5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(service.id)}
+                          className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-red-200 bg-white text-red-500 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors shadow-sm"
+                          aria-label="Eliminar servicio"
+                        >
+                          <SidebarIcon name="delete" className="h-5 w-5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -495,14 +561,34 @@ export default function GestionServicios() {
 
             <div>
               <label className="form-label">Tiempo Estimado</label>
-              <input
-                name="tiempo"
-                value={formValues.tiempo}
-                onChange={handleInputChange}
-                required
-                className="form-input"
-                placeholder="Ej. 30-40 min"
-              />
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
+                <input
+                  name="tiempoCantidad"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={formValues.tiempoCantidad}
+                  onChange={handleInputChange}
+                  required
+                  className="form-input"
+                  placeholder="Ej. 30"
+                />
+                <select
+                  name="tiempoUnidad"
+                  value={formValues.tiempoUnidad}
+                  onChange={handleInputChange}
+                  className="form-input min-w-[140px]"
+                >
+                  {TIME_UNIT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+              {formValues.tiempoOriginal && !formValues.tiempoEditado && (
+                <p className="mt-2 text-xs text-slate-500">
+                  Valor actual: {formValues.tiempoOriginal}
+                </p>
+              )}
             </div>
           </div>
 

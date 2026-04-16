@@ -36,12 +36,21 @@ const routeNameMap = {
   categorias: "Categorias",
   marcas: "Marcas",
   carrusel: "Carrusel",
+  "destacados-inicio": "Destacados Inicio",
   respaldos: "Respaldos BD",
+};
+
+const customBreadcrumbs = {
+  "/admin/reportes/estadisticas": [
+    { to: "/admin", label: "Administrador" },
+    { to: "/admin/reportes/estadisticas", label: "Estadisticas" },
+  ],
 };
 
 export default function Breadcrumbs() {
   const location = useLocation();
   const pathnames = location.pathname.split("/").filter((x) => x);
+  const normalizedPath = location.pathname.replace(/\/+$/, "") || "/";
   const firstSegment = pathnames[0];
   const homePath = firstSegment === "admin"
     ? "/admin"
@@ -51,6 +60,12 @@ export default function Breadcrumbs() {
 
   if (pathnames.length === 0) return null;
 
+  const breadcrumbItems = customBreadcrumbs[normalizedPath]
+    || pathnames.map((value, index) => ({
+      to: `/${pathnames.slice(0, index + 1).join("/")}`,
+      label: routeNameMap[value] || value.charAt(0).toUpperCase() + value.slice(1),
+    }));
+
   return (
     <nav className="text-sm font-medium text-rose-500 mb-4" aria-label="Breadcrumb">
       <ol className="list-none p-0 inline-flex">
@@ -59,21 +74,19 @@ export default function Breadcrumbs() {
             Inicio
           </Link>
         </li>
-        {pathnames.map((value, index) => {
-          const to = `/${pathnames.slice(0, index + 1).join("/")}`;
-          const isLast = index === pathnames.length - 1;
-          const name = routeNameMap[value] || value.charAt(0).toUpperCase() + value.slice(1);
+        {breadcrumbItems.map((item, index) => {
+          const isLast = index === breadcrumbItems.length - 1;
 
           return (
-            <li key={to} className="flex items-center">
+            <li key={item.to} className="flex items-center">
               <span className="mx-2 text-rose-300">/</span>
               {isLast ? (
                 <span className="text-rose-700 font-bold" aria-current="page">
-                  {name}
+                  {item.label}
                 </span>
               ) : (
-                <Link to={to} className="hover:text-rose-700 transition-colors">
-                  {name}
+                <Link to={item.to} className="hover:text-rose-700 transition-colors">
+                  {item.label}
                 </Link>
               )}
             </li>

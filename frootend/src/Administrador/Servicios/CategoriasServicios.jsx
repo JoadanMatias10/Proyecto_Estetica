@@ -4,7 +4,7 @@ import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import SidebarIcon from "../../components/ui/SidebarIcon";
 import { endpoints, requestJson } from "../../api";
 
-const SERVICE_SEGMENTS = ["Mujer", "Hombre", "Nino"];
+const SERVICE_SEGMENTS = ["Dama", "Caballero", "Niño"];
 
 const getDefaultFormValues = (category = null) => ({
   nombre: category?.nombre || "",

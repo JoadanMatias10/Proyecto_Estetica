@@ -81,7 +81,6 @@ export default function PoliticaPrivacidad() {
       ) : (
         <div className="card mt-8 p-7 space-y-4 text-slate-600">
           <p>Aun no hay un documento de politicas publicado.</p>
-          <p>El administrador puede cargarlo desde el panel de informacion de la empresa.</p>
         </div>
       )}
     </div>

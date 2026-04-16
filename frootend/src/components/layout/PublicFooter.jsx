@@ -2,6 +2,41 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchPublicCompanyInfo } from "../../utils/publicCatalogApi";
 import SidebarIcon from "../ui/SidebarIcon";
+import Logo from "../../img/Logo para una estéti.png";
+
+function normalizeExternalUrl(value) {
+  const url = String(value || "").trim();
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  return `https://${url}`;
+}
+
+function SocialIcon({ name, className = "h-5 w-5" }) {
+  if (name === "facebook") {
+    return (
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>
+        <path d="M13.5 21v-7h2.4l.4-3h-2.8V9.1c0-.9.3-1.6 1.6-1.6H16.5V4.8c-.2 0-1-.1-2-.1-2 0-3.4 1.2-3.4 3.6V11H8.8v3h2.3v7h2.4Z" />
+      </svg>
+    );
+  }
+
+  if (name === "instagram") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
+        <rect x="3.25" y="3.25" width="17.5" height="17.5" rx="5.25" stroke="currentColor" strokeWidth="1.8" />
+        <circle cx="12" cy="12" r="4.1" stroke="currentColor" strokeWidth="1.8" />
+        <circle cx="17.4" cy="6.7" r="1.1" fill="currentColor" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
+      <path d="M12 3.75a8.25 8.25 0 1 0 0 16.5a8.25 8.25 0 0 0 0-16.5Z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M3.75 12h16.5M12 3.75c2.1 2.26 3.25 5.2 3.25 8.25S14.1 18 12 20.25C9.9 18 8.75 15.05 8.75 12S9.9 6 12 3.75Z" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
 
 export default function PublicFooter() {
   const [companyInfo, setCompanyInfo] = useState(null);
@@ -30,24 +65,71 @@ export default function PublicFooter() {
     .map((value) => String(value || "").trim())
     .filter(Boolean)
     .join(" | ");
+  const facebookUrl = normalizeExternalUrl(companyInfo?.facebook);
+  const instagramUrl = normalizeExternalUrl(companyInfo?.instagram);
+  const socialLinks = [
+    {
+      key: "instagram",
+      label: "Instagram",
+      href: instagramUrl || "/redes-sociales",
+      external: Boolean(instagramUrl),
+    },
+    {
+      key: "facebook",
+      label: "Facebook",
+      href: facebookUrl || "/redes-sociales",
+      external: Boolean(facebookUrl),
+    },
+    {
+      key: "site",
+      label: "Redes",
+      href: "/redes-sociales",
+      external: false,
+    },
+  ];
 
   return (
-    <footer className="bg-gradient-to-br from-violet-50/50 via-rose-50/30 to-white border-t border-slate-200/50 py-12 px-4 mt-16" id="contacto">
+    <footer className="bg-white border-t border-slate-200/50 py-12 px-4" id="contacto">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
         <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-400 to-violet-500 flex items-center justify-center shadow-md">
-              <span className="text-xs font-bold text-white">EP</span>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-14 w-14 overflow-hidden rounded-2xl border border-white/70 bg-white shadow-md ring-4 ring-white/60">
+              <img src={Logo} alt={`Logo de ${businessName}`} className="h-full w-full object-cover" />
             </div>
-            <span className="font-bold text-xl page-title">{businessName}</span>
+            <div className="min-w-0">
+              <span className="block font-bold text-xl page-title leading-tight">{businessName}</span>
+              <span className="block text-sm font-medium text-violet-500">Belleza & Bienestar</span>
+            </div>
           </div>
           <p className="text-slate-600 mb-4 leading-relaxed">
             Belleza profesional con toque panamericano.
           </p>
           <div className="flex gap-3">
-            <Link to="/redes-sociales" className="social-icon">ig</Link>
-            <Link to="/redes-sociales" className="social-icon">f</Link>
-            <Link to="/redes-sociales" className="social-icon">in</Link>
+            {socialLinks.map((social) =>
+              social.external ? (
+                <a
+                  key={social.key}
+                  href={social.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="social-icon"
+                  aria-label={social.label}
+                  title={social.label}
+                >
+                  <SocialIcon name={social.key} />
+                </a>
+              ) : (
+                <Link
+                  key={social.key}
+                  to={social.href}
+                  className="social-icon"
+                  aria-label={social.label}
+                  title={social.label}
+                >
+                  <SocialIcon name={social.key} />
+                </Link>
+              )
+            )}
           </div>
         </div>
 

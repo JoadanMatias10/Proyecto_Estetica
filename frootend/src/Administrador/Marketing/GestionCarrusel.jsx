@@ -1,24 +1,13 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Modal from "../../components/ui/Modal";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import SidebarIcon from "../../components/ui/SidebarIcon";
 import { endpoints, requestJson } from "../../api";
 
-const CAROUSEL_BG_OPTIONS = [
-  "from-rose-400 to-violet-500",
-  "from-violet-400 to-rose-400",
-  "from-amber-400 to-rose-400",
-  "from-rose-500 to-violet-600",
-  "from-cyan-400 to-blue-500",
-  "from-emerald-400 to-teal-500",
-];
-
 const getDefaultFormValues = (slide = null) => ({
-  title: slide?.title || "",
-  description: slide?.description || "",
-  image: slide?.image || "",
+  imagePreview: slide?.image || "",
   imageName: "",
-  bgColor: slide?.bgColor || CAROUSEL_BG_OPTIONS[0],
+  imageFile: null,
   estado: slide?.estado || "Activa",
 });
 
@@ -33,8 +22,7 @@ export default function GestionCarrusel() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(null);
   const [formValues, setFormValues] = useState(getDefaultFormValues());
-
-  const slidesOrdenados = useMemo(() => slides, [slides]);
+  const fileInputRef = useRef(null);
 
   const loadSlides = async () => {
     setLoading(true);
@@ -63,6 +51,9 @@ export default function GestionCarrusel() {
   const closeModal = () => {
     setCurrentSlide(null);
     setFormValues(getDefaultFormValues());
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
     setIsModalOpen(false);
   };
 
@@ -83,35 +74,47 @@ export default function GestionCarrusel() {
     reader.onloadend = () => {
       setFormValues((prev) => ({
         ...prev,
-        image: reader.result?.toString() || "",
+        imagePreview: reader.result?.toString() || "",
         imageName: file.name || "",
+        imageFile: file,
       }));
     };
     reader.readAsDataURL(file);
   };
 
   const handleClearImage = () => {
-    setFormValues((prev) => ({ ...prev, image: "", imageName: "" }));
+    setFormValues((prev) => ({
+      ...prev,
+      imagePreview: currentSlide?.image || "",
+      imageName: "",
+      imageFile: null,
+    }));
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const title = formValues.title.trim();
-    const description = formValues.description.trim();
-    const image = formValues.image.trim();
-    if (!title || !description || !image) {
-      window.alert("Completa titulo, descripcion e imagen.");
+    const hasImage = Boolean(formValues.imageFile || currentSlide?.image);
+    if (!hasImage) {
+      window.alert("Debes seleccionar una imagen para el carrusel.");
       return;
     }
 
-    const payload = {
-      title,
-      description,
-      image,
-      bgColor: formValues.bgColor,
-      estado: formValues.estado,
-    };
+    const payload = new FormData();
+    payload.append("estado", formValues.estado);
+
+    if (formValues.imageFile) {
+      payload.append("imagen", formValues.imageFile);
+    } else if (currentSlide?.image) {
+      payload.append("image", currentSlide.image);
+      if (currentSlide?.imagePublicId) {
+        payload.append("imagePublicId", currentSlide.imagePublicId);
+      }
+    }
 
     setSubmitting(true);
     try {
@@ -130,6 +133,7 @@ export default function GestionCarrusel() {
       }
 
       await loadSlides();
+      window.dispatchEvent(new CustomEvent("carouselSlidesUpdated"));
       closeModal();
     } catch (error) {
       window.alert(error.message || "No fue posible guardar el slide.");
@@ -139,13 +143,14 @@ export default function GestionCarrusel() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Eliminar este slide del carrusel?")) return;
+    if (!window.confirm("Eliminar esta imagen del carrusel?")) return;
     try {
       await requestJson(endpoints.adminCarouselById(id), {
         method: "DELETE",
         token: getAdminToken(),
       });
       await loadSlides();
+      window.dispatchEvent(new CustomEvent("carouselSlidesUpdated"));
     } catch (error) {
       window.alert(error.message || "No fue posible eliminar el slide.");
     }
@@ -154,6 +159,7 @@ export default function GestionCarrusel() {
   const moveSlide = async (index, direction) => {
     const targetIndex = index + direction;
     if (targetIndex < 0 || targetIndex >= slides.length) return;
+
     const nextSlides = [...slides];
     const [item] = nextSlides.splice(index, 1);
     nextSlides.splice(targetIndex, 0, item);
@@ -166,6 +172,7 @@ export default function GestionCarrusel() {
         body: { ids: nextSlides.map((slide) => slide.id) },
       });
       setSlides(Array.isArray(data.slides) ? data.slides : nextSlides);
+      window.dispatchEvent(new CustomEvent("carouselSlidesUpdated"));
     } catch (error) {
       window.alert(error.message || "No fue posible reordenar slides.");
       loadSlides();
@@ -174,70 +181,72 @@ export default function GestionCarrusel() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Gestion de Carrusel</h1>
-          <p className="text-slate-500 text-sm">Administra imagenes y textos del carrusel de la pagina de inicio.</p>
+          <p className="text-sm text-slate-500">
+            Administra las imagenes del hero principal. El texto y botones del inicio quedan fijos encima del carrusel.
+          </p>
         </div>
         <button
           type="button"
           onClick={() => openModal()}
-          aria-label="Nuevo Slide"
-          title="Nuevo Slide"
-          className="w-10 h-10 p-0 rounded-full text-black border-2 border-slate-300 bg-white hover:bg-slate-50"
+          aria-label="Nueva imagen"
+          title="Nueva imagen"
+          className="h-10 w-10 rounded-full border-2 border-slate-300 bg-white p-0 text-black hover:bg-slate-50"
         >
           +
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
         {loading ? (
           <LoadingSpinner fullScreen={false} text="Cargando slides..." className="py-14" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-slate-600">
-              <thead className="bg-slate-50 text-slate-800 font-semibold uppercase text-xs">
+              <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-800">
                 <tr>
                   <th className="px-6 py-4">Orden</th>
                   <th className="px-6 py-4">Imagen</th>
-                  <th className="px-6 py-4">Titulo</th>
-                  <th className="px-6 py-4">Descripcion</th>
                   <th className="px-6 py-4">Estado</th>
-                  <th className="px-6 py-4 text-right w-52">Acciones</th>
+                  <th className="w-52 px-6 py-4 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {slidesOrdenados.map((slide, index) => (
-                  <tr key={slide.id} className="hover:bg-slate-50 transition-colors">
+                {slides.map((slide, index) => (
+                  <tr key={slide.id} className="transition-colors hover:bg-slate-50">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-700 w-5">{index + 1}</span>
+                        <span className="w-5 text-sm font-semibold text-slate-700">{index + 1}</span>
                         <button
                           type="button"
                           onClick={() => moveSlide(index, -1)}
                           disabled={index === 0}
-                          className="px-2 py-1 text-xs rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-40"
+                          className="rounded bg-slate-100 px-2 py-1 text-xs hover:bg-slate-200 disabled:opacity-40"
                         >
                           Subir
                         </button>
                         <button
                           type="button"
                           onClick={() => moveSlide(index, 1)}
-                          disabled={index === slidesOrdenados.length - 1}
-                          className="px-2 py-1 text-xs rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-40"
+                          disabled={index === slides.length - 1}
+                          className="rounded bg-slate-100 px-2 py-1 text-xs hover:bg-slate-200 disabled:opacity-40"
                         >
                           Bajar
                         </button>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <img src={slide.image} alt={slide.title} className="h-12 w-20 rounded-lg object-cover border border-slate-200" />
+                      <img
+                        src={slide.image}
+                        alt={`Slide ${index + 1}`}
+                        className="h-16 w-32 rounded-xl border border-slate-200 object-cover"
+                      />
                     </td>
-                    <td className="px-6 py-4 font-medium text-slate-900">{slide.title}</td>
-                    <td className="px-6 py-4 text-slate-500 max-w-sm truncate">{slide.description}</td>
                     <td className="px-6 py-4">
                       <span
-                        className={`px-2 py-1 rounded-md text-xs font-semibold ${
+                        className={`rounded-md px-2 py-1 text-xs font-semibold ${
                           slide.estado === "Activa"
                             ? "bg-emerald-50 text-emerald-600"
                             : "bg-slate-100 text-slate-500"
@@ -251,7 +260,7 @@ export default function GestionCarrusel() {
                         <button
                           onClick={() => openModal(slide)}
                           type="button"
-                          className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-orange-200 bg-white text-orange-500 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 transition-colors shadow-sm"
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-orange-200 bg-white text-orange-500 shadow-sm transition-colors hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600"
                           aria-label="Editar slide"
                         >
                           <SidebarIcon name="edit" className="h-5 w-5" />
@@ -259,7 +268,7 @@ export default function GestionCarrusel() {
                         <button
                           onClick={() => handleDelete(slide.id)}
                           type="button"
-                          className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-red-200 bg-white text-red-500 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors shadow-sm"
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 bg-white text-red-500 shadow-sm transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-600"
                           aria-label="Eliminar slide"
                         >
                           <SidebarIcon name="delete" className="h-5 w-5" />
@@ -268,9 +277,11 @@ export default function GestionCarrusel() {
                     </td>
                   </tr>
                 ))}
-                {slidesOrdenados.length === 0 && (
+                {slides.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="text-center py-8 text-slate-400">No hay slides registrados.</td>
+                    <td colSpan="4" className="py-8 text-center text-slate-400">
+                      No hay imagenes registradas para el carrusel.
+                    </td>
                   </tr>
                 )}
               </tbody>
@@ -282,65 +293,36 @@ export default function GestionCarrusel() {
       <Modal
         isOpen={isModalOpen}
         onClose={closeModal}
-        title={currentSlide ? "Editar Slide" : "Nuevo Slide"}
-        maxWidthClass="max-w-3xl"
+        title={currentSlide ? "Editar imagen del carrusel" : "Nueva imagen del carrusel"}
+        maxWidthClass="max-w-2xl"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="form-label">Titulo</label>
-            <input
-              name="title"
-              value={formValues.title}
+            <label className="form-label">Estado</label>
+            <select
+              name="estado"
+              value={formValues.estado}
               onChange={handleInputChange}
               className="form-input"
-              placeholder="Ej. Promociones de temporada"
-              required
-            />
-          </div>
-          <div>
-            <label className="form-label">Descripcion</label>
-            <textarea
-              name="description"
-              value={formValues.description}
-              onChange={handleInputChange}
-              rows="3"
-              className="form-input resize-none"
-              placeholder="Texto que se mostrara en el carrusel..."
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="form-label">Color del degradado</label>
-              <select name="bgColor" value={formValues.bgColor} onChange={handleInputChange} className="form-input">
-                {CAROUSEL_BG_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="form-label">Estado</label>
-              <select name="estado" value={formValues.estado} onChange={handleInputChange} className="form-input">
-                <option value="Activa">Activa</option>
-                <option value="Inactiva">Inactiva</option>
-              </select>
-            </div>
+            >
+              <option value="Activa">Activa</option>
+              <option value="Inactiva">Inactiva</option>
+            </select>
           </div>
 
           <div>
-            <label className="form-label">Imagen del Slide</label>
-            <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-3 flex flex-wrap items-center gap-3">
+            <label className="form-label">Imagen del carrusel</label>
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-3">
               <label
                 htmlFor="imagen-slide-input"
-                className="inline-flex items-center px-3 py-2 rounded-lg bg-violet-100 text-violet-700 text-sm font-semibold cursor-pointer hover:bg-violet-200 transition-colors"
+                className="inline-flex cursor-pointer items-center rounded-lg bg-violet-100 px-3 py-2 text-sm font-semibold text-violet-700 transition-colors hover:bg-violet-200"
               >
                 Elegir imagen
               </label>
-              <span className="text-sm text-slate-500 truncate">
-                {formValues.imageName || (formValues.image ? "Imagen cargada" : "Ningun archivo seleccionado")}
+              <span className="truncate text-sm text-slate-500">
+                {formValues.imageName || (formValues.imagePreview ? "Imagen cargada" : "Ningun archivo seleccionado")}
               </span>
-              {formValues.image && (
+              {(formValues.imageFile || currentSlide?.image) && (
                 <button
                   type="button"
                   onClick={handleClearImage}
@@ -351,37 +333,41 @@ export default function GestionCarrusel() {
               )}
               <input
                 id="imagen-slide-input"
+                ref={fileInputRef}
                 type="file"
                 accept="image/*"
                 onChange={handleImageChange}
                 className="sr-only"
               />
             </div>
-            {formValues.image && (
+            <p className="mt-2 text-xs text-slate-500">
+              Esta imagen se sube a Cloudinary y se guarda su URL en la base de datos.
+            </p>
+            {formValues.imagePreview && (
               <div className="mt-3">
                 <img
-                  src={formValues.image}
+                  src={formValues.imagePreview}
                   alt="Preview slide"
-                  className="h-28 w-full max-w-sm rounded-xl object-cover border border-slate-200 shadow-sm"
+                  className="h-48 w-full rounded-2xl border border-slate-200 object-cover shadow-sm"
                 />
               </div>
             )}
           </div>
 
-          <div className="pt-4 flex justify-end gap-3">
+          <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"
               onClick={closeModal}
-              className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200"
+              className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 disabled:opacity-60"
+              className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-60"
             >
-              {submitting ? "Guardando..." : currentSlide ? "Guardar Cambios" : "Crear Slide"}
+              {submitting ? "Guardando..." : currentSlide ? "Guardar cambios" : "Crear slide"}
             </button>
           </div>
         </form>

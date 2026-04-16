@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import SidebarIcon from "../components/ui/SidebarIcon";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
@@ -31,6 +31,7 @@ export default function DashboardAdmin() {
     citasHoy: 0,
     stockBajo: 0,
   });
+  const latestRequestRef = useRef(0);
 
   const stats = useMemo(
     () => [
@@ -59,37 +60,74 @@ export default function DashboardAdmin() {
     [summary]
   );
 
-  useEffect(() => {
-    const loadDashboard = async () => {
+  const loadDashboard = useCallback(async ({ silent = false } = {}) => {
+    const requestId = latestRequestRef.current + 1;
+    latestRequestRef.current = requestId;
+
+    if (!silent) {
       setLoading(true);
       setErrorMessage("");
-      const token = getAdminToken();
-      const today = toLocalDateString(new Date());
+    }
 
-      try {
-        const [salesData, servicesData, productsData] = await Promise.all([
-          requestJson(endpoints.adminSales({ desde: today, hasta: today }), { token }),
-          requestJson(endpoints.adminReports({ tipo: "Servicio", desde: today, hasta: today }), { token }),
-          requestJson(endpoints.adminProducts, { token }),
-        ]);
+    const token = getAdminToken();
+    const today = toLocalDateString(new Date());
 
-        const products = Array.isArray(productsData.products) ? productsData.products : [];
-        const stockBajo = products.filter((product) => Number(product.stock || 0) <= 10).length;
+    try {
+      const [salesData, servicesData, productsData] = await Promise.all([
+        requestJson(endpoints.adminSales({ desde: today, hasta: today }), { token }),
+        requestJson(endpoints.adminReports({ tipo: "Servicio", desde: today, hasta: today }), { token }),
+        requestJson(endpoints.adminProducts, { token }),
+      ]);
 
-        setSummary({
-          ventasHoy: Number(salesData.summary?.total || 0),
-          citasHoy: Number(servicesData.summary?.totalRegistros || 0),
-          stockBajo,
-        });
-      } catch (error) {
-        setErrorMessage(error.message || "No fue posible cargar el resumen del dashboard.");
-      } finally {
+      if (latestRequestRef.current !== requestId) return;
+
+      const products = Array.isArray(productsData.products) ? productsData.products : [];
+      const stockBajo = products.filter((product) => Number(product.stock || 0) <= 5).length;
+
+      setSummary({
+        ventasHoy: Number(salesData.summary?.total || 0),
+        citasHoy: Number(servicesData.summary?.totalRegistros || 0),
+        stockBajo,
+      });
+      setErrorMessage("");
+    } catch (error) {
+      if (latestRequestRef.current !== requestId) return;
+      setErrorMessage(error.message || "No fue posible cargar el resumen del dashboard.");
+    } finally {
+      if (latestRequestRef.current === requestId) {
         setLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    const refreshDashboard = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      void loadDashboard({ silent: true });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") {
+        void loadDashboard({ silent: true });
       }
     };
 
-    loadDashboard();
-  }, []);
+    const intervalId = window.setInterval(refreshDashboard, 30000);
+    window.addEventListener("focus", refreshDashboard);
+    window.addEventListener("adminSalesUpdated", refreshDashboard);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshDashboard);
+      window.removeEventListener("adminSalesUpdated", refreshDashboard);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [loadDashboard]);
 
   const quickActions = [
     {

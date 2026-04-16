@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import Button from "../../components/ui/Button";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import SidebarIcon from "../../components/ui/SidebarIcon";
-import ServiceGalleryStrip from "../../components/services/ServiceGalleryStrip";
 import { fetchPublicServicesBundle, getServiceSubcategoriesBySegment } from "../../utils/publicCatalogApi";
 
 export default function ConsultaServicio() {
@@ -197,17 +196,19 @@ export default function ConsultaServicio() {
           </div>
         )}
 
-        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200 ${(isLoading || isFilterLoading) ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 transition-opacity duration-200 ${(isLoading || isFilterLoading) ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
           {isLoading ? (
             <div className="col-span-full h-[420px]" />
           ) : filteredServices.length > 0 ? (
             filteredServices.map((service) => (
-              <div key={service.id} className="card hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group rounded-2xl overflow-hidden flex flex-col h-full border border-slate-100/50">
-                <div className="h-44 bg-gradient-to-br from-violet-50 to-rose-50 relative overflow-hidden group-hover:from-violet-100 group-hover:to-rose-100 transition-colors duration-500">
+              <div key={service.id} className="card hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group rounded-3xl overflow-hidden flex flex-col h-full border border-slate-100/50">
+                <div className="relative w-full h-72 overflow-hidden rounded-t-3xl bg-gradient-to-br from-violet-50 to-rose-50 group-hover:from-violet-100 group-hover:to-rose-100 transition-colors duration-500">
                   <img
-                    src={service.imagen || `https://placehold.co/800x500/F5F3FF/7C3AED?text=${encodeURIComponent(service.nombre)}`}
+                    src={service.imagen || `https://placehold.co/1200x900/F5F3FF/7C3AED?text=${encodeURIComponent(service.nombre)}`}
                     alt={service.nombre}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100"
+                    className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.03] opacity-100"
+                    loading="lazy"
+                    decoding="async"
                   />
                   <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
                     <span className="bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[10px] font-bold text-violet-600 shadow-sm border border-violet-100 text-center">
@@ -220,22 +221,22 @@ export default function ConsultaServicio() {
                 </div>
 
                 <div className="p-5 flex-1 flex flex-col bg-white">
-                  <h3 className="section-title mb-2">{service.nombre}</h3>
-                  <p className="page-subtitle mt-1">{service.descripcion}</p>
-                  <div className="mt-4 text-slate-600 text-sm">
-                    Duracion: <span className="font-semibold">{service.tiempo}</span>
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <span className="rounded-full bg-violet-50 px-3 py-1 text-[11px] font-semibold text-violet-700">
+                      {service.segmento}
+                    </span>
+                    <span className="rounded-full bg-indigo-50 px-3 py-1 text-[11px] font-semibold text-indigo-700">
+                      {service.subcategoria}
+                    </span>
                   </div>
-                  <div className="mt-1 text-slate-700">
-                    Desde <span className="font-bold text-rose-600 text-xl">${Number(service.precio || 0).toFixed(2)}</span> <span className="text-xs">MXN</span>
-                  </div>
-                  <ServiceGalleryStrip service={service} />
-                  <div className="mt-5">
-                    <Link to="/login">
-                      <Button variant="outline" className="w-full py-2.5 border-2 rounded-xl">
-                        Iniciar sesion para agendar
-                      </Button>
-                    </Link>
-                  </div>
+
+                  <h3 className="section-title mb-4">{service.nombre}</h3>
+
+                  <Link to={`/servicios/${service.id}`} className="mt-auto block">
+                    <Button variant="outline" className="w-full py-2.5 border-2 rounded-xl">
+                      Ver detalle
+                    </Button>
+                  </Link>
                 </div>
               </div>
             ))
@@ -260,6 +261,7 @@ export default function ConsultaServicio() {
           )}
         </div>
       </div>
+
     </div>
   );
 }

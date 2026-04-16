@@ -44,8 +44,8 @@ export default function InicioSesionAdmin() {
           password: formData.password,
         }),
       });
-
       const data = await response.json();
+
       if (!response.ok) {
         setServerError(data.errors ? data.errors[0] : "No fue posible iniciar sesion.");
         return;
@@ -148,4 +148,3 @@ export default function InicioSesionAdmin() {
     </div>
   );
 }
-

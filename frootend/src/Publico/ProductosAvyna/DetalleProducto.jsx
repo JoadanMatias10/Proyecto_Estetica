@@ -129,8 +129,8 @@ export default function DetalleProducto() {
               >+</button>
             </div>
 
-            <Link to="/login" className="w-full sm:w-auto flex-1">
-              <button className="w-full h-14 bg-violet-600 hover:bg-violet-700 text-white font-bold uppercase tracking-wider text-sm rounded-xl shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all duration-300 transform hover:-translate-y-1 flex items-center justify-center gap-2">
+            <Link to="/login" className="w-full sm:w-auto">
+              <button className="w-full sm:min-w-[250px] h-12 px-5 bg-violet-600 hover:bg-violet-700 text-white font-bold uppercase tracking-[0.14em] text-xs rounded-xl shadow-md shadow-violet-200 hover:shadow-violet-300 transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
                 <span>Iniciar sesion para comprar</span>
               </button>
             </Link>

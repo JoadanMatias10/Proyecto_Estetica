@@ -196,6 +196,7 @@ export default function RegistrarVenta() {
       });
 
       window.alert(`Venta registrada correctamente (ID: ${data.sale?.id || "N/A"}).`);
+      window.dispatchEvent(new CustomEvent("adminSalesUpdated"));
       setCart([]);
       setCliente("");
       setMetodoPago("Efectivo");

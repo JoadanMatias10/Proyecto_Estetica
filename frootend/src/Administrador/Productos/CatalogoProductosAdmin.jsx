@@ -25,8 +25,8 @@ const PRESENTATION_UNITS = [
 ];
 
 const PRESENTATION_QUANTITIES = {
-  ml: [30, 60, 100, 125, 200, 250, 500, 1000],
-  g: [50, 100, 150, 250, 500, 1000],
+  ml: [10,30, 50, 60, 100, 125, 150, 200, 250, 300, 500, 750, 1000],
+  g: [50, 52, 80, 100, 150, 250, 500, 1000],
 };
 
 const DEFAULT_PRESENTATION_QUANTITY = {
@@ -68,6 +68,7 @@ const getDefaultFormValues = (product, categories, brands) => {
     imagenNombre: product?.imagenNombre || "",
     unidadMedida,
     cantidadMedida: cantidadMedida ? String(cantidadMedida) : "",
+    destacadoInicio: Boolean(product?.destacadoInicio),
   };
 };
 
@@ -171,19 +172,20 @@ export default function CatalogoProductosAdmin() {
   };
 
   const handleInputChange = (event) => {
-    const { name, value } = event.target;
+    const { name, value, type, checked } = event.target;
+    const nextValue = type === "checkbox" ? checked : value;
 
     if (name === "unidadMedida") {
-      const nextQuantity = getDefaultPresentationQuantity(value);
+      const nextQuantity = getDefaultPresentationQuantity(nextValue);
       setFormValues((prev) => ({
         ...prev,
-        unidadMedida: value,
+        unidadMedida: nextValue,
         cantidadMedida: nextQuantity ? String(nextQuantity) : "",
       }));
       return;
     }
 
-    setFormValues((prev) => ({ ...prev, [name]: value }));
+    setFormValues((prev) => ({ ...prev, [name]: nextValue }));
   };
 
   const handleImageChange = (event) => {
@@ -326,6 +328,7 @@ export default function CatalogoProductosAdmin() {
       cantidadMedida: hasPresentation ? Number(formValues.cantidadMedida) : "",
       unidadMedida: formValues.unidadMedida,
       rating: currentProduct?.rating || 4.8,
+      destacadoInicio: formValues.destacadoInicio,
     };
 
     const shouldUseFormData = Boolean(selectedImageFile) || !currentProduct;

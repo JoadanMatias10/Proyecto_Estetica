@@ -10,6 +10,7 @@ const getDefaultFormValues = (promotion = null) => ({
   descripcion: promotion?.descripcion || "",
   descuento: promotion?.descuento || "",
   estado: promotion?.estado || "Activa",
+  destacadoInicio: Boolean(promotion?.destacadoInicio),
 });
 
 function getAdminToken() {
@@ -55,8 +56,8 @@ export default function Promociones() {
   };
 
   const handleInputChange = (event) => {
-    const { name, value } = event.target;
-    setFormValues((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = event.target;
+    setFormValues((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
   };
 
   const handleDelete = async (id) => {
@@ -83,6 +84,7 @@ export default function Promociones() {
         descripcion: formValues.descripcion.trim(),
         descuento: formValues.descuento.trim(),
         estado: formValues.estado,
+        destacadoInicio: formValues.destacadoInicio,
       };
 
       if (currentPromo) {
