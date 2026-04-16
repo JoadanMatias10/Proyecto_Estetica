@@ -9,6 +9,7 @@ const ServiceCategory = require("../models/CategoriaServicio");
 const Service = require("../models/Servicio");
 const CompanyInfo = require("../models/InformacionEmpresa");
 const CarouselSlide = require("../models/DiapositivaCarrusel");
+const Promotion = require("../models/Promocion");
 const { hashPassword, verifyPassword } = require("../utils/contrasena");
 const { createToken } = require("../utils/auth");
 const {
@@ -28,6 +29,7 @@ const {
   validatePhone,
   validatePassword,
 } = require("../utils/validadores");
+const { normalizeServiceSegmentInRecord } = require("../utils/serviceSegments");
 
 const router = express.Router();
 
@@ -37,12 +39,13 @@ function isValidId(id) {
 
 function mapId(record) {
   if (!record) return null;
-  return {
+  const mappedRecord = {
     id: record._id.toString(),
     ...record,
     _id: undefined,
     __v: undefined,
   };
+  return normalizeServiceSegmentInRecord(mappedRecord);
 }
 
 function mapCompanyInfo(record) {
@@ -445,19 +448,52 @@ router.get("/services", async (_req, res) => {
   return res.json({ services: services.map(mapId) });
 });
 
+router.get("/services/:id", async (req, res) => {
+  if (!isValidId(req.params.id)) {
+    return res.status(404).json({ errors: ["Servicio no encontrado."] });
+  }
+
+  const service = await Service.findOne({ _id: { $eq: new mongoose.Types.ObjectId(req.params.id) } }).lean();
+  if (!service) {
+    return res.status(404).json({ errors: ["Servicio no encontrado."] });
+  }
+
+  return res.json({ service: mapId(service) });
+});
+
+router.get("/promotions", async (_req, res) => {
+  const promotions = await Promotion.find({ estado: "Activa" }).sort({ createdAt: -1 }).lean();
+  return res.json({ promotions: promotions.map(mapId) });
+});
+
+router.get("/home-highlights", async (_req, res) => {
+  const [products, services, promotions] = await Promise.all([
+    Product.find({ destacadoInicio: true }).sort({ createdAt: -1 }).limit(4).lean(),
+    Service.find({ destacadoInicio: true }).sort({ createdAt: -1 }).limit(4).lean(),
+    Promotion.find({ estado: "Activa", destacadoInicio: true }).sort({ createdAt: -1 }).limit(4).lean(),
+  ]);
+
+  return res.json({
+    products: products.map(mapId),
+    services: services.map(mapId),
+    promotions: promotions.map(mapId),
+  });
+});
+
 router.get("/carousel", async (_req, res) => {
   const slides = await CarouselSlide.find({ estado: "Activa" }).sort({ orden: 1, createdAt: 1 }).lean();
   return res.json({ slides: slides.map(mapId) });
 });
 
 router.get("/bootstrap", async (_req, res) => {
-  const [company, categories, brands, products, serviceCategories, services, slides] = await Promise.all([
+  const [company, categories, brands, products, serviceCategories, services, promotions, slides] = await Promise.all([
     CompanyInfo.findOne({ key: "main" }).lean(),
     ProductCategory.find({ estado: "Activa" }).sort({ nombre: 1 }).lean(),
     ProductBrand.find({ estado: "Activa" }).sort({ nombre: 1 }).lean(),
     Product.find().sort({ createdAt: -1 }).lean(),
     ServiceCategory.find({ estado: "Activa" }).sort({ segmento: 1, nombre: 1 }).lean(),
     Service.find().sort({ createdAt: -1 }).lean(),
+    Promotion.find({ estado: "Activa" }).sort({ createdAt: -1 }).lean(),
     CarouselSlide.find({ estado: "Activa" }).sort({ orden: 1, createdAt: 1 }).lean(),
   ]);
 
@@ -468,6 +504,7 @@ router.get("/bootstrap", async (_req, res) => {
     products: products.map(mapId),
     serviceCategories: serviceCategories.map(mapId),
     services: services.map(mapId),
+    promotions: promotions.map(mapId),
     carouselSlides: slides.map(mapId),
   });
 });

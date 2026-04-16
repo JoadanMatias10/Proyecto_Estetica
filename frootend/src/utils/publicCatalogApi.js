@@ -65,3 +65,30 @@ export async function fetchPublicServicesBundle() {
     serviceSegments: getServiceSegments(serviceCategories, services),
   };
 }
+
+export async function fetchPublicPromotions() {
+  try {
+    const data = await requestJson(endpoints.publicPromotions);
+    return Array.isArray(data.promotions) ? data.promotions : [];
+  } catch (error) {
+    if (Number(error?.status) !== 404) {
+      throw error;
+    }
+
+    try {
+      const bootstrapData = await requestJson(endpoints.publicBootstrap);
+      return Array.isArray(bootstrapData.promotions) ? bootstrapData.promotions : [];
+    } catch (_bootstrapError) {
+      return [];
+    }
+  }
+}
+
+export async function fetchPublicHomeHighlights() {
+  const data = await requestJson(endpoints.publicHomeHighlights);
+  return {
+    products: Array.isArray(data.products) ? data.products : [],
+    services: Array.isArray(data.services) ? data.services : [],
+    promotions: Array.isArray(data.promotions) ? data.promotions : [],
+  };
+}

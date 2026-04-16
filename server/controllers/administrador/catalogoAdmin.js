@@ -1,4 +1,6 @@
 const multer = require("multer");
+const { recordRecentOperation } = require("../../utils/recentOperationTracker");
+const { buildServiceSegmentFilter } = require("../../utils/serviceSegments");
 
 let xlsxCache = null;
 let xlsxLoadError = null;
@@ -37,12 +39,12 @@ function registrarCatalogoAdminRoutes(router, contexto) {
     mapId,
     mapCompanyInfo,
     normalizeCarouselOrder,
-    CAROUSEL_BG_OPTIONS,
     estimateBase64Bytes,
     ALLOWED_POLICY_DOCUMENT_TYPES,
     MAX_POLICY_DOCUMENT_BYTES,
     upload,
     serviceUpload,
+    carouselUpload,
     cloudinary,
   } = contexto;
 
@@ -85,6 +87,17 @@ const SERVICE_IMAGE_UPLOAD_FIELDS = [
 
 function isDataUrlImage(value) {
   return /^data:image\//i.test(String(value || "").trim());
+}
+
+function parseBooleanFlag(value, fallback = false) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "si", "sí", "on"].includes(normalized)) return true;
+    if (["false", "0", "no", "off", ""].includes(normalized)) return false;
+  }
+  if (typeof value === "number") return value === 1;
+  return fallback;
 }
 
 async function destroyCloudinaryImage(publicId) {
@@ -226,8 +239,12 @@ function parseServiceGalleryActives(value, fallback = SERVICE_GALLERY_FIELD_NAME
 }
 
 function normalizeProductPresentationFields({ cantidadMedida, unidadMedida }) {
-  const rawQuantity = sanitizeText(cantidadMedida);
-  const rawUnit = sanitizeText(unidadMedida).toLowerCase();
+  const rawQuantity = cantidadMedida === null || typeof cantidadMedida === "undefined"
+    ? ""
+    : String(cantidadMedida).trim();
+  const rawUnit = unidadMedida === null || typeof unidadMedida === "undefined"
+    ? ""
+    : String(unidadMedida).trim().toLowerCase();
   const normalizedUnit = sanitizeProductUnit(rawUnit);
   const normalizedQuantity = rawQuantity ? parsePositiveNumber(rawQuantity, NaN) : null;
   const errors = [];
@@ -584,6 +601,7 @@ router.post("/products/import", excelUpload.single("archivo"), async (req, res) 
         const previousImagePublicId = sanitizeText(existingByName.imagenPublicId);
         Object.assign(existingByName, productData);
         await existingByName.save();
+        recordRecentOperation({ collection: "productos", type: "update" });
         if (imagen && previousImagePublicId) {
           await destroyCloudinaryImage(previousImagePublicId);
         }
@@ -592,6 +610,7 @@ router.post("/products/import", excelUpload.single("archivo"), async (req, res) 
       }
 
       await Product.create(productData);
+      recordRecentOperation({ collection: "productos", type: "insert" });
       created += 1;
     }
 
@@ -627,6 +646,7 @@ router.post("/products", requireCloudinaryUploadSupport, upload.single("imagen")
   });
   const { cantidadMedida, unidadMedida } = presentation;
   const rating = parsePositiveNumber(req.body.rating, 4.8);
+  const destacadoInicio = parseBooleanFlag(req.body.destacadoInicio, false);
 
   const errors = [];
   if (!nombre) errors.push("Nombre de producto es obligatorio.");
@@ -665,7 +685,9 @@ router.post("/products", requireCloudinaryUploadSupport, upload.single("imagen")
       imagenPublicId,
       imagenNombre,
       rating: Math.min(Math.max(rating, 0), 5),
+      destacadoInicio,
     });
+    recordRecentOperation({ collection: "productos", type: "insert" });
 
     return res.status(201).json({ product: mapId(product.toObject()) });
   } catch (error) {
@@ -703,6 +725,7 @@ router.put("/products/:id", requireCloudinaryUploadSupport, upload.single("image
   });
   const { cantidadMedida, unidadMedida } = presentation;
   const rating = parsePositiveNumber(req.body.rating, current.rating || 4.8);
+  const destacadoInicio = parseBooleanFlag(req.body.destacadoInicio, current.destacadoInicio);
 
   const errors = [];
   if (!nombre) errors.push("Nombre de producto es obligatorio.");
@@ -738,6 +761,7 @@ router.put("/products/:id", requireCloudinaryUploadSupport, upload.single("image
     current.categoria = categoria;
     current.descripcion = descripcion;
     current.rating = Math.min(Math.max(rating, 0), 5);
+    current.destacadoInicio = destacadoInicio;
 
     if (uploadedImage?.path) {
       current.imagen = imagen;
@@ -750,6 +774,7 @@ router.put("/products/:id", requireCloudinaryUploadSupport, upload.single("image
     }
 
     await current.save();
+    recordRecentOperation({ collection: "productos", type: "update" });
 
     if (uploadedImage?.path && previousImagePublicId && previousImagePublicId !== imagenPublicId) {
       await destroyCloudinaryImage(previousImagePublicId);
@@ -772,6 +797,7 @@ router.delete("/products/:id", async (req, res) => {
   if (!deleted) {
     return res.status(404).json({ errors: ["Producto no encontrado."] });
   }
+  recordRecentOperation({ collection: "productos", type: "delete" });
   await destroyCloudinaryImage(deleted.imagenPublicId);
   return res.json({ message: "Producto eliminado." });
 });
@@ -796,13 +822,14 @@ router.post("/service-categories", async (req, res) => {
     "nombre",
     nombre,
     null,
-    { segmento }
+    buildServiceSegmentFilter(segmento)
   );
   if (duplicated) {
     return res.status(409).json({ errors: ["Esa categoria ya existe para el segmento seleccionado."] });
   }
 
   const category = await ServiceCategory.create({ nombre, segmento, estado, descripcion });
+  recordRecentOperation({ collection: "categorias_servicio", type: "insert" });
   return res.status(201).json({ category: mapId(category.toObject()) });
 });
 
@@ -831,7 +858,7 @@ router.put("/service-categories/:id", async (req, res) => {
     "nombre",
     nombre,
     id,
-    { segmento }
+    buildServiceSegmentFilter(segmento)
   );
   if (duplicated) {
     return res.status(409).json({ errors: ["Esa categoria ya existe para el segmento seleccionado."] });
@@ -844,10 +871,11 @@ router.put("/service-categories/:id", async (req, res) => {
   current.estado = estado;
   current.descripcion = descripcion;
   await current.save();
+  recordRecentOperation({ collection: "categorias_servicio", type: "update" });
 
   if (previousSegment !== segmento || previousName !== nombre) {
     await Service.updateMany(
-      { segmento: previousSegment, subcategoria: previousName },
+      { ...buildServiceSegmentFilter(previousSegment), subcategoria: previousName },
       { segmento, subcategoria: nombre }
     );
   }
@@ -867,7 +895,7 @@ router.delete("/service-categories/:id", async (req, res) => {
   }
 
   const usedByServices = await Service.countDocuments({
-    segmento: current.segmento,
+    ...buildServiceSegmentFilter(current.segmento),
     subcategoria: current.nombre,
   });
   if (usedByServices > 0) {
@@ -877,6 +905,7 @@ router.delete("/service-categories/:id", async (req, res) => {
   }
 
   await ServiceCategory.deleteOne({ _id: id });
+  recordRecentOperation({ collection: "categorias_servicio", type: "delete" });
   return res.json({ message: "Categoria eliminada." });
 });
 
@@ -899,6 +928,7 @@ router.post("/services", requireCloudinaryUploadSupport, serviceUpload.fields(SE
   const imagenNombre = sanitizeText(uploadedImage?.originalname || req.body.imagenNombre);
   const tiempo = sanitizeText(req.body.tiempo);
   const precio = parsePositiveNumber(req.body.precio, NaN);
+  const destacadoInicio = parseBooleanFlag(req.body.destacadoInicio, false);
 
   const errors = [];
   if (!nombre) errors.push("Nombre de servicio es obligatorio.");
@@ -908,7 +938,10 @@ router.post("/services", requireCloudinaryUploadSupport, serviceUpload.fields(SE
   if (!imagen) errors.push("La imagen del servicio es obligatoria.");
   if (isDataUrlImage(imagen)) errors.push("La imagen debe enviarse como archivo o URL valida, no en base64.");
 
-  const category = await ServiceCategory.findOne({ segmento, nombre: subcategoria });
+  const category = await ServiceCategory.findOne({
+    ...buildServiceSegmentFilter(segmento),
+    nombre: subcategoria,
+  });
   if (!category) {
     errors.push("La subcategoria no existe para el segmento seleccionado.");
   }
@@ -937,8 +970,10 @@ router.post("/services", requireCloudinaryUploadSupport, serviceUpload.fields(SE
       imagenPublicId,
       imagenNombre,
       galeriaImagenes,
+      destacadoInicio,
     });
 
+    recordRecentOperation({ collection: "servicios", type: "insert" });
     return res.status(201).json({ service: mapId(service.toObject()) });
   } catch (error) {
     await cleanupUploadedCloudinaryImages([uploadedImage, ...uploadedGalleryImages]);
@@ -972,6 +1007,7 @@ router.put("/services/:id", requireCloudinaryUploadSupport, serviceUpload.fields
   const imagenNombre = sanitizeText(uploadedImage?.originalname || req.body.imagenNombre);
   const tiempo = sanitizeText(req.body.tiempo);
   const precio = parsePositiveNumber(req.body.precio, NaN);
+  const destacadoInicio = parseBooleanFlag(req.body.destacadoInicio, current.destacadoInicio);
   const currentGallerySlots = normalizeServiceGallerySlots(current.galeriaImagenes);
   const galleryActives = parseServiceGalleryActives(
     req.body.galeriaImagenesActivas,
@@ -985,7 +1021,10 @@ router.put("/services/:id", requireCloudinaryUploadSupport, serviceUpload.fields
   if (!Number.isFinite(precio)) errors.push("Precio invalido.");
   if (isDataUrlImage(imagen)) errors.push("La imagen debe enviarse como archivo o URL valida, no en base64.");
 
-  const category = await ServiceCategory.findOne({ segmento, nombre: subcategoria });
+  const category = await ServiceCategory.findOne({
+    ...buildServiceSegmentFilter(segmento),
+    nombre: subcategoria,
+  });
   if (!category) {
     errors.push("La subcategoria no existe para el segmento seleccionado.");
   }
@@ -1018,6 +1057,7 @@ router.put("/services/:id", requireCloudinaryUploadSupport, serviceUpload.fields
     current.precio = precio;
     current.tiempo = tiempo;
     current.descripcion = descripcion;
+    current.destacadoInicio = destacadoInicio;
     current.galeriaImagenes = nextGallerySlots;
 
     if (uploadedImage?.path) {
@@ -1031,6 +1071,7 @@ router.put("/services/:id", requireCloudinaryUploadSupport, serviceUpload.fields
     }
 
     await current.save();
+    recordRecentOperation({ collection: "servicios", type: "update" });
 
     const imagesToDelete = [];
     if (uploadedImage?.path && previousImagePublicId && previousImagePublicId !== imagenPublicId) {
@@ -1075,6 +1116,7 @@ router.delete("/services/:id", async (req, res) => {
     destroyCloudinaryImage(deleted.imagenPublicId),
     ...galleryPublicIds.map((publicId) => destroyCloudinaryImage(publicId)),
   ]);
+  recordRecentOperation({ collection: "servicios", type: "delete" });
   return res.json({ message: "Servicio eliminado." });
 });
 
@@ -1142,26 +1184,36 @@ router.get("/carousel", async (_req, res) => {
   return res.json({ slides: slides.map(mapId) });
 });
 
-router.post("/carousel", async (req, res) => {
-  const title = sanitizeText(req.body.title);
-  const description = sanitizeText(req.body.description);
-  const image = sanitizeText(req.body.image);
+router.post("/carousel", requireCloudinaryUploadSupport, carouselUpload.single("imagen"), async (req, res) => {
+  const uploadedImage = req.file;
+  const image = sanitizeText(uploadedImage?.path || req.body.image);
+  const imagePublicId = sanitizeText(uploadedImage?.filename || req.body.imagePublicId);
   const estado = sanitizeState(req.body.estado);
-  const bgColor = CAROUSEL_BG_OPTIONS.includes(req.body.bgColor)
-    ? req.body.bgColor
-    : CAROUSEL_BG_OPTIONS[0];
 
   const errors = [];
-  if (!title) errors.push("Titulo es obligatorio.");
-  if (!description) errors.push("Descripcion es obligatoria.");
-  if (!image) errors.push("Imagen es obligatoria.");
-  if (errors.length) return res.status(400).json({ errors });
+  if (!image) errors.push("La imagen del slide es obligatoria.");
+  if (isDataUrlImage(image)) errors.push("La imagen debe enviarse como archivo o URL valida, no en base64.");
+
+  if (errors.length) {
+    await cleanupUploadedCloudinaryImage(uploadedImage);
+    return res.status(400).json({ errors });
+  }
 
   const maxOrderSlide = await CarouselSlide.findOne().sort({ orden: -1 }).lean();
   const orden = maxOrderSlide ? maxOrderSlide.orden + 1 : 0;
 
-  const slide = await CarouselSlide.create({ title, description, image, bgColor, estado, orden });
-  return res.status(201).json({ slide: mapId(slide.toObject()) });
+  try {
+    const slide = await CarouselSlide.create({
+      image,
+      imagePublicId,
+      estado,
+      orden,
+    });
+    return res.status(201).json({ slide: mapId(slide.toObject()) });
+  } catch (error) {
+    await cleanupUploadedCloudinaryImage(uploadedImage);
+    throw error;
+  }
 });
 
 router.put("/carousel/reorder", async (req, res) => {
@@ -1190,39 +1242,49 @@ router.put("/carousel/reorder", async (req, res) => {
   return res.json({ slides: slides.map(mapId) });
 });
 
-router.put("/carousel/:id", async (req, res) => {
+router.put("/carousel/:id", requireCloudinaryUploadSupport, carouselUpload.single("imagen"), async (req, res) => {
+  const uploadedImage = req.file;
   const { id } = req.params;
   if (!isValidId(id)) {
+    await cleanupUploadedCloudinaryImage(uploadedImage);
     return res.status(400).json({ errors: ["Slide invalido."] });
   }
 
   const current = await CarouselSlide.findById(id);
   if (!current) {
+    await cleanupUploadedCloudinaryImage(uploadedImage);
     return res.status(404).json({ errors: ["Slide no encontrado."] });
   }
 
-  const title = sanitizeText(req.body.title);
-  const description = sanitizeText(req.body.description);
-  const image = sanitizeText(req.body.image);
+  const nextImage = sanitizeText(uploadedImage?.path || req.body.image || current.image);
+  const nextImagePublicId = sanitizeText(uploadedImage?.filename || req.body.imagePublicId || current.imagePublicId);
   const estado = sanitizeState(req.body.estado);
-  const bgColor = CAROUSEL_BG_OPTIONS.includes(req.body.bgColor)
-    ? req.body.bgColor
-    : CAROUSEL_BG_OPTIONS[0];
 
   const errors = [];
-  if (!title) errors.push("Titulo es obligatorio.");
-  if (!description) errors.push("Descripcion es obligatoria.");
-  if (!image) errors.push("Imagen es obligatoria.");
-  if (errors.length) return res.status(400).json({ errors });
+  if (!nextImage) errors.push("La imagen del slide es obligatoria.");
+  if (isDataUrlImage(nextImage)) errors.push("La imagen debe enviarse como archivo o URL valida, no en base64.");
+  if (errors.length) {
+    await cleanupUploadedCloudinaryImage(uploadedImage);
+    return res.status(400).json({ errors });
+  }
 
-  current.title = title;
-  current.description = description;
-  current.image = image;
+  const previousImagePublicId = current.imagePublicId;
+  current.image = nextImage;
+  current.imagePublicId = nextImagePublicId;
   current.estado = estado;
-  current.bgColor = bgColor;
-  await current.save();
 
-  return res.json({ slide: mapId(current.toObject()) });
+  try {
+    await current.save();
+
+    if (uploadedImage && previousImagePublicId && previousImagePublicId !== nextImagePublicId) {
+      await destroyCloudinaryImage(previousImagePublicId);
+    }
+
+    return res.json({ slide: mapId(current.toObject()) });
+  } catch (error) {
+    await cleanupUploadedCloudinaryImage(uploadedImage);
+    throw error;
+  }
 });
 
 router.delete("/carousel/:id", async (req, res) => {
@@ -1236,6 +1298,7 @@ router.delete("/carousel/:id", async (req, res) => {
     return res.status(404).json({ errors: ["Slide no encontrado."] });
   }
 
+  await destroyCloudinaryImage(deleted.imagePublicId);
   await normalizeCarouselOrder();
 
   return res.json({ message: "Slide eliminado." });

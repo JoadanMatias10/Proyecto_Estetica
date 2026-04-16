@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { SERVICE_SEGMENTS, normalizeServiceSegment } = require("../utils/serviceSegments");
 
 const serviceGalleryImageSchema = new mongoose.Schema(
   {
@@ -12,7 +13,7 @@ const serviceGalleryImageSchema = new mongoose.Schema(
 const serviceSchema = new mongoose.Schema(
   {
     nombre: { type: String, required: true, trim: true },
-    segmento: { type: String, enum: ["Mujer", "Hombre", "Nino"], required: true },
+    segmento: { type: String, enum: SERVICE_SEGMENTS, required: true, set: normalizeServiceSegment },
     subcategoria: { type: String, required: true, trim: true },
     precio: { type: Number, required: true, min: 0 },
     tiempo: { type: String, required: true, trim: true },
@@ -24,11 +25,13 @@ const serviceSchema = new mongoose.Schema(
       type: [serviceGalleryImageSchema],
       default: () => [],
     },
+    destacadoInicio: { type: Boolean, default: false },
   },
   { timestamps: true, collection: "servicios" }
 );
 
 serviceSchema.index({ segmento: 1, subcategoria: 1 });
 serviceSchema.index({ nombre: 1 });
+serviceSchema.index({ destacadoInicio: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Service", serviceSchema);

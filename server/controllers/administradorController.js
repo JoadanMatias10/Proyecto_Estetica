@@ -16,6 +16,7 @@ const Sale = require("../models/Venta");
 const InventoryMovement = require("../models/MovimientoInventario");
 const { verifyPassword } = require("../utils/contrasena");
 const { createToken, verifyToken } = require("../utils/auth");
+const { recordRecentOperation } = require("../utils/recentOperationTracker");
 const {
   ACCOUNT_STATUS,
   INVITE_EXPIRATION_MS,
@@ -29,8 +30,9 @@ const {
 const { normalizeString } = require("../utils/validadores");
 const {
   SERVICE_SEGMENTS,
-  CAROUSEL_BG_OPTIONS,
-} = require("../utils/datosCatalogoPredeterminado");
+  normalizeServiceSegment,
+  normalizeServiceSegmentInRecord,
+} = require("../utils/serviceSegments");
 
 const router = express.Router();
 
@@ -39,7 +41,8 @@ const registrarRespaldosAdminRoutes = require("./administrador/respaldosAdmin");
 const registrarInventarioAdminRoutes = require("./administrador/inventarioAdmin");
 const registrarStaffAdminRoutes = require("./administrador/staffAdmin");
 const registrarCatalogoAdminRoutes = require("./administrador/catalogoAdmin");
-const { productUpload, serviceUpload } = require("../middleware/multer");
+const registrarMonitorAdminRoutes = require("./administrador/monitorAdmin");
+const { productUpload, serviceUpload, carouselUpload } = require("../middleware/multer");
 const cloudinary = require("../config/cloudinary");
 
 const MAX_ATTEMPTS = 5;
@@ -68,19 +71,41 @@ const ETIQUETAS_COLECCIONES = {
   informacion_empresa: "Informacion de empresa",
   diapositivas_carrusel: "Diapositivas de carrusel",
   miembros_personal: "Miembros del personal",
+  tokens_acceso_cuenta: "Tokens de acceso",
   promociones: "Promociones",
   ventas: "Ventas",
   movimientos_inventario: "Movimientos de inventario",
+  configuracion_respaldo_automatico_admin: "Configuracion de respaldo automatico",
 };
 
 function mapId(record) {
   if (!record) return null;
-  return {
+  const mappedRecord = {
     id: record._id.toString(),
     ...record,
     _id: undefined,
     __v: undefined,
   };
+  return normalizeServiceSegmentInRecord(mappedRecord);
+}
+
+function parseBooleanFlag(value, fallback = false) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "si", "sí", "on"].includes(normalized)) return true;
+    if (["false", "0", "no", "off", ""].includes(normalized)) return false;
+  }
+  if (typeof value === "number") return value === 1;
+  return fallback;
+}
+
+function normalizeObjectIdList(values) {
+  const source = Array.isArray(values) ? values : [];
+  const uniqueIds = Array.from(new Set(source.map((value) => String(value || "").trim()).filter(Boolean)));
+  return uniqueIds
+    .filter((value) => mongoose.Types.ObjectId.isValid(value))
+    .map((value) => new mongoose.Types.ObjectId(value));
 }
 
 function mapCompanyInfo(record) {
@@ -114,6 +139,10 @@ function mapSale(record) {
   if (!source) return null;
   return {
     ...source,
+    estado: source.estado === "Anulada" ? "Anulada" : "Activa",
+    anuladaAt: source.anuladaAt || null,
+    anuladaPor: source.anuladaPor || "",
+    motivoAnulacion: source.motivoAnulacion || "",
     items: Array.isArray(source.items)
       ? source.items.map((item) => ({
         ...item,
@@ -188,7 +217,7 @@ function estimateBase64Bytes(base64Content) {
 }
 
 function sanitizeSegment(value) {
-  return SERVICE_SEGMENTS.includes(value) ? value : SERVICE_SEGMENTS[0];
+  return normalizeServiceSegment(value, SERVICE_SEGMENTS[0]);
 }
 
 function sanitizeInventoryAction(value) {
@@ -315,6 +344,32 @@ function getEndOfDay(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
 }
 
+function parseDateInput(value) {
+  const normalized = normalizeString(value);
+  if (!normalized) return null;
+
+  const localDateMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (localDateMatch) {
+    const year = Number(localDateMatch[1]);
+    const monthIndex = Number(localDateMatch[2]) - 1;
+    const day = Number(localDateMatch[3]);
+    const parsed = new Date(year, monthIndex, day);
+
+    if (
+      parsed.getFullYear() === year &&
+      parsed.getMonth() === monthIndex &&
+      parsed.getDate() === day
+    ) {
+      return parsed;
+    }
+    return null;
+  }
+
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
 // Construye un rango de fecha de forma segura para Mongo: solo fechas válidas.
 function buildDateRangeFilter(fromDate, toDate) {
   const safeFrom = fromDate instanceof Date && !Number.isNaN(fromDate.getTime()) ? fromDate : null;
@@ -391,13 +446,14 @@ async function obtenerNombresColeccionesDisponibles() {
 async function obtenerResumenColeccion(nombreColeccion) {
   const db = mongoose.connection.db;
   const coleccion = db.collection(nombreColeccion);
-  const cantidadDocumentos = await coleccion.countDocuments();
-
+  let cantidadDocumentos = 0;
   let tamanoBytes = 0;
   try {
     const stats = await db.command({ collStats: nombreColeccion });
+    cantidadDocumentos = Number(stats?.count || 0);
     tamanoBytes = Number(stats?.size || 0);
   } catch (_error) {
+    cantidadDocumentos = await coleccion.estimatedDocumentCount().catch(() => 0);
     tamanoBytes = 0;
   }
 
@@ -415,6 +471,325 @@ function guardarResumenEnHistorial(resumen) {
   if (historialRespaldos.length > LIMITE_HISTORIAL_RESPALDOS) {
     historialRespaldos.length = LIMITE_HISTORIAL_RESPALDOS;
   }
+}
+
+function padMonthNumber(value) {
+  return String(value).padStart(2, "0");
+}
+
+function buildPredictiveMonthKeys(referenceDate, count = 12) {
+  return Array.from({ length: count }, (_, index) => {
+    const current = new Date(
+      referenceDate.getFullYear(),
+      referenceDate.getMonth() - count + 1 + index,
+      1
+    );
+    return `${current.getFullYear()}-${padMonthNumber(current.getMonth() + 1)}`;
+  });
+}
+
+function linearRegressionSeries(values) {
+  const series = Array.isArray(values) ? values.map((value) => Number(value || 0)) : [];
+  const n = series.length;
+  if (!n) return { m: 0, b: 0 };
+
+  const xs = series.map((_, index) => index);
+  const sumX = xs.reduce((total, value) => total + value, 0);
+  const sumY = series.reduce((total, value) => total + value, 0);
+  const sumXY = xs.reduce((total, value, index) => total + value * series[index], 0);
+  const sumX2 = xs.reduce((total, value) => total + value * value, 0);
+  const denominator = n * sumX2 - sumX * sumX;
+
+  if (!denominator) {
+    return { m: 0, b: sumY / n };
+  }
+
+  return {
+    m: (n * sumXY - sumX * sumY) / denominator,
+    b: (sumY - ((n * sumXY - sumX * sumY) / denominator) * sumX) / n,
+  };
+}
+
+function predictSeriesValue(values, stepsAhead = 1) {
+  const series = Array.isArray(values) ? values.map((value) => Number(value || 0)) : [];
+  const { m, b } = linearRegressionSeries(series);
+  const nextX = series.length - 1 + stepsAhead;
+  return Math.max(0, Math.round(m * nextX + b));
+}
+
+function sumPredictedDemand(values, months) {
+  return Array.from({ length: months }, (_, index) => predictSeriesValue(values, index + 1)).reduce(
+    (total, value) => total + value,
+    0
+  );
+}
+
+function roundMetric(value, decimals = 1) {
+  if (!Number.isFinite(value)) return null;
+  return Number(value.toFixed(decimals));
+}
+
+function calculatePredictiveError(values) {
+  const series = Array.isArray(values) ? values.map((value) => Number(value || 0)) : [];
+  if (series.length < 4) {
+    return { errorRate: null, evaluatedMonths: 0 };
+  }
+
+  let totalAbsoluteError = 0;
+  let totalActual = 0;
+  let evaluatedMonths = 0;
+
+  for (let index = 3; index < series.length; index += 1) {
+    const actual = Number(series[index] || 0);
+    const predicted = predictSeriesValue(series.slice(0, index), 1);
+    totalAbsoluteError += Math.abs(actual - predicted);
+    totalActual += actual;
+    evaluatedMonths += 1;
+  }
+
+  if (!evaluatedMonths || totalActual <= 0) {
+    return { errorRate: null, evaluatedMonths };
+  }
+
+  return {
+    errorRate: roundMetric((totalAbsoluteError / totalActual) * 100, 1),
+    evaluatedMonths,
+  };
+}
+
+function calculatePredictiveConfidence({ monthsWithData, errorRate, evaluatedMonths, totalUnits }) {
+  let score = 100;
+
+  if (monthsWithData < 8) score -= 20;
+  if (monthsWithData < 5) score -= 20;
+  if (evaluatedMonths < 4) score -= 15;
+  if (totalUnits < 24) score -= 10;
+
+  if (errorRate === null) {
+    score -= 20;
+  } else if (errorRate > 45) {
+    score -= 35;
+  } else if (errorRate > 30) {
+    score -= 20;
+  } else if (errorRate > 20) {
+    score -= 10;
+  }
+
+  const normalizedScore = Math.max(15, Math.min(100, score));
+  if (normalizedScore >= 75) return { level: "Alta", score: normalizedScore };
+  if (normalizedScore >= 50) return { level: "Media", score: normalizedScore };
+  return { level: "Baja", score: normalizedScore };
+}
+
+function buildPredictiveCategorySummary({
+  values,
+  lastSaleAt,
+  stockActual,
+  totalProducts,
+  generatedAt,
+}) {
+  const series = Array.isArray(values) ? values.map((value) => Number(value || 0)) : [];
+  const monthsAnalyzed = series.length;
+  const monthsWithData = series.filter((value) => value > 0).length;
+  const totalUnits = series.reduce((total, value) => total + value, 0);
+  const lastMonthSales = Number(series[series.length - 1] || 0);
+  const nextMonth = predictSeriesValue(series, 1);
+  const next3Months = sumPredictedDemand(series, 3);
+  const next6Months = sumPredictedDemand(series, 6);
+  const { m: trendSlope } = linearRegressionSeries(series);
+  const averageProjectedMonthly = next3Months > 0 ? next3Months / 3 : 0;
+  const stockCoverageMonths = averageProjectedMonthly > 0
+    ? roundMetric(stockActual / averageProjectedMonthly, 1)
+    : null;
+  const suggestedRestock = Math.max(0, Math.ceil(next3Months * 1.1 - stockActual));
+  const riskBreakage = stockActual < nextMonth || (stockCoverageMonths !== null && stockCoverageMonths < 1.5);
+  const riskOverstock = stockActual > 0 && (next3Months === 0 || (stockCoverageMonths !== null && stockCoverageMonths > 6));
+  const { errorRate, evaluatedMonths } = calculatePredictiveError(series);
+  const confidence = calculatePredictiveConfidence({
+    monthsWithData,
+    errorRate,
+    evaluatedMonths,
+    totalUnits,
+  });
+
+  return {
+    monthsAnalyzed,
+    monthsWithData,
+    totalUnits,
+    lastMonthSales,
+    lastSaleAt: lastSaleAt ? new Date(lastSaleAt).toISOString() : null,
+    generatedAt: generatedAt.toISOString(),
+    totalProducts,
+    stockActual,
+    trendSlope: roundMetric(trendSlope, 2),
+    projectedNextMonth: nextMonth,
+    projected3Months: next3Months,
+    projected6Months: next6Months,
+    errorRate,
+    evaluatedMonths,
+    confidence,
+    stockCoverageMonths,
+    suggestedRestock,
+    riskBreakage,
+    riskOverstock,
+  };
+}
+
+function buildPredictiveProductSummary({
+  productId,
+  nombre,
+  marca,
+  values,
+  lastSaleAt,
+  stockActual,
+}) {
+  const series = Array.isArray(values) ? values.map((value) => Number(value || 0)) : [];
+  const monthsWithData = series.filter((value) => value > 0).length;
+  const totalUnits = series.reduce((total, value) => total + value, 0);
+  const projectedNextMonth = predictSeriesValue(series, 1);
+  const projected3Months = sumPredictedDemand(series, 3);
+  const projected6Months = sumPredictedDemand(series, 6);
+  const avgProjectedMonthly = projected3Months > 0 ? projected3Months / 3 : 0;
+  const stockCoverageMonths = avgProjectedMonthly > 0
+    ? roundMetric(stockActual / avgProjectedMonthly, 1)
+    : null;
+  const suggestedRestock = Math.max(0, Math.ceil(projected3Months * 1.05 - stockActual));
+  const riskBreakage = stockActual < projectedNextMonth || (stockCoverageMonths !== null && stockCoverageMonths < 1.5);
+  const riskOverstock = stockActual > 0 && (projected3Months === 0 || (stockCoverageMonths !== null && stockCoverageMonths > 6));
+  const lowRotation = totalUnits <= 6 && monthsWithData <= 2 && stockActual > 0;
+
+  return {
+    productId: productId ? String(productId) : "",
+    nombre: String(nombre || "Producto sin nombre"),
+    marca: String(marca || "Sin marca"),
+    totalUnits,
+    monthsWithData,
+    lastSaleAt: lastSaleAt ? new Date(lastSaleAt).toISOString() : null,
+    stockActual,
+    projectedNextMonth,
+    projected3Months,
+    projected6Months,
+    stockCoverageMonths,
+    suggestedRestock,
+    riskBreakage,
+    riskOverstock,
+    lowRotation,
+  };
+}
+
+function buildPredictiveAlerts(categorySummaries, productBreakdown) {
+  const alerts = [];
+  const severityWeight = { Alta: 3, Media: 2, Baja: 1 };
+
+  Object.entries(categorySummaries || {}).forEach(([categoryName, summary]) => {
+    if (summary?.riskBreakage) {
+      alerts.push({
+        id: `cat-break-${categoryName}`,
+        severity: "Alta",
+        type: "stock",
+        category: categoryName,
+        title: `Riesgo de quiebre en ${categoryName}`,
+        description: summary.suggestedRestock > 0
+          ? `El stock actual no cubre la demanda estimada. Conviene reponer al menos ${summary.suggestedRestock} uds.`
+          : "La cobertura estimada es baja frente a la demanda del proximo mes.",
+        metric: `${summary.stockCoverageMonths ?? "N/D"} meses`,
+      });
+    }
+
+    if (summary?.riskOverstock) {
+      alerts.push({
+        id: `cat-over-${categoryName}`,
+        severity: "Media",
+        type: "stock",
+        category: categoryName,
+        title: `Sobrestock probable en ${categoryName}`,
+        description: "El inventario disponible supera con amplitud la demanda esperada. Conviene revisar compras o impulsar promociones.",
+        metric: `${summary.stockCoverageMonths ?? "N/D"} meses`,
+      });
+    }
+
+    if (summary?.confidence?.level === "Baja") {
+      alerts.push({
+        id: `cat-confidence-${categoryName}`,
+        severity: "Media",
+        type: "modelo",
+        category: categoryName,
+        title: `Pronostico de baja confianza en ${categoryName}`,
+        description: "La categoria tiene pocos meses con ventas o error historico elevado. Toma el pronostico como referencia y no como valor definitivo.",
+        metric: `${summary.confidence?.score || 0}/100`,
+      });
+    }
+
+    if (summary?.lastMonthSales > 0 && summary?.projectedNextMonth >= summary.lastMonthSales * 1.35) {
+      alerts.push({
+        id: `cat-growth-${categoryName}`,
+        severity: "Media",
+        type: "demanda",
+        category: categoryName,
+        title: `Crecimiento fuerte esperado en ${categoryName}`,
+        description: "La proyeccion del proximo mes acelera con fuerza respecto al ultimo mes real. Conviene anticipar compras y preparacion operativa.",
+        metric: `${summary.projectedNextMonth} uds.`,
+      });
+    }
+
+    if (summary?.lastMonthSales > 0 && summary?.projectedNextMonth <= summary.lastMonthSales * 0.7) {
+      alerts.push({
+        id: `cat-drop-${categoryName}`,
+        severity: "Baja",
+        type: "demanda",
+        category: categoryName,
+        title: `Desaceleracion esperada en ${categoryName}`,
+        description: "La proyeccion cae respecto al ultimo mes real. Puede ser una señal para revisar promociones o compras futuras.",
+        metric: `${summary.projectedNextMonth} uds.`,
+      });
+    }
+
+    const products = Array.isArray(productBreakdown?.[categoryName]) ? productBreakdown[categoryName] : [];
+
+    products
+      .filter((product) => product.riskBreakage)
+      .sort((left, right) => (right.suggestedRestock - left.suggestedRestock) || (right.projected3Months - left.projected3Months))
+      .slice(0, 2)
+      .forEach((product) => {
+        alerts.push({
+          id: `product-break-${categoryName}-${product.productId || product.nombre}`,
+          severity: "Alta",
+          type: "producto",
+          category: categoryName,
+          productId: product.productId,
+          productName: product.nombre,
+          title: `Reabasto sugerido: ${product.nombre}`,
+          description: `La demanda estimada del producto supera su stock actual. Conviene reponer ${product.suggestedRestock} uds.`,
+          metric: `${product.suggestedRestock} uds.`,
+        });
+      });
+
+    products
+      .filter((product) => product.lowRotation)
+      .sort((left, right) => right.stockActual - left.stockActual)
+      .slice(0, 1)
+      .forEach((product) => {
+        alerts.push({
+          id: `product-rotation-${categoryName}-${product.productId || product.nombre}`,
+          severity: "Baja",
+          type: "producto",
+          category: categoryName,
+          productId: product.productId,
+          productName: product.nombre,
+          title: `Baja rotacion: ${product.nombre}`,
+          description: "El producto mantiene stock, pero ha tenido muy poca salida en la ventana analizada. Conviene revisar compra o exhibicion.",
+          metric: `${product.stockActual} uds.`,
+        });
+      });
+  });
+
+  return alerts
+    .sort((left, right) => {
+      const bySeverity = (severityWeight[right.severity] || 0) - (severityWeight[left.severity] || 0);
+      if (bySeverity !== 0) return bySeverity;
+      return String(left.title || "").localeCompare(String(right.title || ""), "es");
+    })
+    .slice(0, 12);
 }
 
 registrarAuthAdminRoutes(router, {
@@ -491,13 +866,35 @@ registrarCatalogoAdminRoutes(router, {
   mapId,
   mapCompanyInfo,
   normalizeCarouselOrder,
-  CAROUSEL_BG_OPTIONS,
   estimateBase64Bytes,
   ALLOWED_POLICY_DOCUMENT_TYPES,
   MAX_POLICY_DOCUMENT_BYTES,
   upload: productUpload,
   serviceUpload,
+  carouselUpload,
   cloudinary,
+});
+
+registrarMonitorAdminRoutes(router, {
+  mongoose,
+  User,
+  Appointment,
+  ProductCategory,
+  ProductBrand,
+  Product,
+  ServiceCategory,
+  Service,
+  CompanyInfo,
+  CarouselSlide,
+  StaffMember,
+  AccountAccessToken,
+  Promotion,
+  Sale,
+  InventoryMovement,
+  obtenerNombresColeccionesDisponibles,
+  obtenerResumenColeccion,
+  obtenerEtiquetaColeccion,
+  historialRespaldos,
 });
 
 
@@ -605,16 +1002,16 @@ router.get("/reports", async (req, res) => {
   let hasta = null;
 
   if (desdeRaw) {
-    const parsedDesde = new Date(desdeRaw);
-    if (Number.isNaN(parsedDesde.getTime())) {
+    const parsedDesde = parseDateInput(desdeRaw);
+    if (!parsedDesde) {
       return res.status(400).json({ errors: ["Fecha inicio invalida."] });
     }
     desde = getStartOfDay(parsedDesde);
   }
 
   if (hastaRaw) {
-    const parsedHasta = new Date(hastaRaw);
-    if (Number.isNaN(parsedHasta.getTime())) {
+    const parsedHasta = parseDateInput(hastaRaw);
+    if (!parsedHasta) {
       return res.status(400).json({ errors: ["Fecha fin invalida."] });
     }
     hasta = getEndOfDay(parsedHasta);
@@ -624,7 +1021,8 @@ router.get("/reports", async (req, res) => {
     return res.status(400).json({ errors: ["La fecha inicio no puede ser mayor que la fecha fin."] });
   }
 
-  const productFilter = buildFieldDateQuery("createdAt", desde, hasta);
+  const saleFilter = buildFieldDateQuery("createdAt", desde, hasta);
+  saleFilter.estado = { $ne: "Anulada" };
   // Filtro de fecha para citas por fechaHora, construido con mismo patrón seguro.
   const appointmentFilter = buildFieldDateQuery("fechaHora", desde, hasta);
 
@@ -633,8 +1031,8 @@ router.get("/reports", async (req, res) => {
 
   const [products, appointments, services] = await Promise.all([
     shouldIncludeProducts
-      ? Product.find(productFilter)
-           .select("nombre precio createdAt")
+      ? Sale.find(saleFilter)
+           .select("items createdAt usuario total")
            .lean()
       : Promise.resolve([]),
     shouldIncludeServices
@@ -674,13 +1072,13 @@ router.get("/reports", async (req, res) => {
     services.map((service) => [normalizeString(service.nombre).toLowerCase(), Number(service.precio || 0)])
   );
 
-  const productRows = products.map((product) => ({
-    id: `prod-${product._id}`,
-    fecha: product.createdAt,
+  const productRows = products.map((sale) => ({
+    id: `sale-${sale._id}`,
+    fecha: sale.createdAt,
     tipo: "Venta",
-    detalle: product.nombre,
-    monto: Number(product.precio || 0),
-    usuario: "Catalogo",
+    detalle: Array.isArray(sale.items) ? sale.items.map(i => `${i.cantidad}x ${i.producto || 'Producto'}`).join(", ") : "Venta de productos",
+    monto: Number(sale.total || 0),
+    usuario: sale.usuario || "Admin",
   }));
 
   const serviceRows = appointments.map((appointment) => ({
@@ -731,16 +1129,16 @@ router.get("/sales", async (req, res) => {
   let hasta = null;
 
   if (desdeRaw) {
-    const parsedDesde = new Date(desdeRaw);
-    if (Number.isNaN(parsedDesde.getTime())) {
+    const parsedDesde = parseDateInput(desdeRaw);
+    if (!parsedDesde) {
       return res.status(400).json({ errors: ["Fecha inicio invalida."] });
     }
     desde = getStartOfDay(parsedDesde);
   }
 
   if (hastaRaw) {
-    const parsedHasta = new Date(hastaRaw);
-    if (Number.isNaN(parsedHasta.getTime())) {
+    const parsedHasta = parseDateInput(hastaRaw);
+    if (!parsedHasta) {
       return res.status(400).json({ errors: ["Fecha fin invalida."] });
     }
     hasta = getEndOfDay(parsedHasta);
@@ -754,8 +1152,10 @@ router.get("/sales", async (req, res) => {
   const query = buildFieldDateQuery("createdAt", desde, hasta);
   const sales = await Sale.find(query).sort({ createdAt: -1 }).lean();
   const mappedSales = sales.map(mapSale);
-
-  const total = mappedSales.reduce((sum, sale) => sum + Number(sale.total || 0), 0);
+  const total = mappedSales
+    .filter((sale) => sale.estado !== "Anulada")
+    .reduce((sum, sale) => sum + Number(sale.total || 0), 0);
+  const totalAnuladas = mappedSales.filter((sale) => sale.estado === "Anulada").length;
 
   return res.json({
     filters: {
@@ -766,9 +1166,240 @@ router.get("/sales", async (req, res) => {
       total,
       totalVentas: total,
       totalRegistros: mappedSales.length,
+      totalAnuladas,
     },
     sales: mappedSales,
   });
+});
+
+router.get("/sales/predictive", async (req, res) => {
+  try {
+    const today = new Date();
+    const twelveMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+    
+    const salesPipeline = [
+      { $match: { estado: "Activa", createdAt: { $gte: twelveMonthsAgo } } },
+      { $unwind: "$items" },
+      {
+        $lookup: {
+          from: "productos",
+          localField: "items.productId",
+          foreignField: "_id",
+          as: "productoDetails",
+        },
+      },
+      { $unwind: { path: "$productoDetails", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" },
+            categoria: { $ifNull: ["$productoDetails.categoria", "Otro"] },
+          },
+          cantidad: { $sum: "$items.cantidad" },
+          ultimaVentaAt: { $max: "$createdAt" },
+        },
+      },
+      {
+        $sort: {
+          "_id.categoria": 1,
+          "_id.year": 1,
+          "_id.month": 1,
+        },
+      },
+    ];
+
+    const productSalesPipeline = [
+      { $match: { estado: "Activa", createdAt: { $gte: twelveMonthsAgo } } },
+      { $unwind: "$items" },
+      {
+        $lookup: {
+          from: "productos",
+          localField: "items.productId",
+          foreignField: "_id",
+          as: "productoDetails",
+        },
+      },
+      { $unwind: { path: "$productoDetails", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" },
+            categoria: { $ifNull: ["$productoDetails.categoria", "Otro"] },
+            productId: { $ifNull: ["$productoDetails._id", "$items.productId"] },
+            nombre: { $ifNull: ["$productoDetails.nombre", "$items.producto"] },
+            marca: { $ifNull: ["$productoDetails.marca", "Sin marca"] },
+          },
+          cantidad: { $sum: "$items.cantidad" },
+          ultimaVentaAt: { $max: "$createdAt" },
+          stockActual: { $max: { $ifNull: ["$productoDetails.stock", 0] } },
+        },
+      },
+      {
+        $sort: {
+          "_id.categoria": 1,
+          "_id.nombre": 1,
+          "_id.year": 1,
+          "_id.month": 1,
+        },
+      },
+    ];
+
+    const stockPipeline = [
+      {
+        $group: {
+          _id: { $ifNull: ["$categoria", "Otro"] },
+          stockActual: { $sum: "$stock" },
+          totalProductos: { $sum: 1 },
+        },
+      },
+    ];
+
+    const [salesResult, stockResult, productSalesResult] = await Promise.all([
+      Sale.aggregate(salesPipeline),
+      Product.aggregate(stockPipeline),
+      Sale.aggregate(productSalesPipeline),
+    ]);
+
+    const formattedSales = salesResult.map((row) => ({
+      categoria: row._id.categoria,
+      fecha: `${row._id.year}-${padMonthNumber(row._id.month)}`,
+      cantidad: row.cantidad,
+    }));
+
+    const stockByCategory = new Map(
+      stockResult.map((row) => [
+        String(row._id || "Otro"),
+        {
+          stockActual: Number(row.stockActual || 0),
+          totalProductos: Number(row.totalProductos || 0),
+        },
+      ])
+    );
+
+    const monthKeys = buildPredictiveMonthKeys(today, 12);
+    const categoryRows = new Map();
+    const productRows = new Map();
+
+    salesResult.forEach((row) => {
+      const categoryName = String(row?._id?.categoria || "Otro");
+      const monthKey = `${row._id.year}-${padMonthNumber(row._id.month)}`;
+      const current = categoryRows.get(categoryName) || {
+        monthlySales: new Map(),
+        lastSaleAt: null,
+      };
+
+      current.monthlySales.set(monthKey, Number(row.cantidad || 0));
+
+      if (!current.lastSaleAt || new Date(row.ultimaVentaAt) > new Date(current.lastSaleAt)) {
+        current.lastSaleAt = row.ultimaVentaAt;
+      }
+
+      categoryRows.set(categoryName, current);
+    });
+
+    productSalesResult.forEach((row) => {
+      const categoryName = String(row?._id?.categoria || "Otro");
+      const productId = row?._id?.productId ? String(row._id.productId) : String(row?._id?.nombre || "producto");
+      const rowKey = `${categoryName}::${productId}`;
+      const monthKey = `${row._id.year}-${padMonthNumber(row._id.month)}`;
+      const current = productRows.get(rowKey) || {
+        category: categoryName,
+        productId,
+        nombre: String(row?._id?.nombre || "Producto sin nombre"),
+        marca: String(row?._id?.marca || "Sin marca"),
+        stockActual: Number(row.stockActual || 0),
+        lastSaleAt: null,
+        monthlySales: new Map(),
+      };
+
+      current.monthlySales.set(monthKey, Number(row.cantidad || 0));
+      current.stockActual = Number(row.stockActual || current.stockActual || 0);
+
+      if (!current.lastSaleAt || new Date(row.ultimaVentaAt) > new Date(current.lastSaleAt)) {
+        current.lastSaleAt = row.ultimaVentaAt;
+      }
+
+      productRows.set(rowKey, current);
+    });
+
+    const categorySummaries = {};
+    Array.from(categoryRows.entries())
+      .sort(([categoryA], [categoryB]) => categoryA.localeCompare(categoryB, "es"))
+      .forEach(([categoryName, row]) => {
+        const values = monthKeys.map((monthKey) => Number(row.monthlySales.get(monthKey) || 0));
+        const stockInfo = stockByCategory.get(categoryName) || { stockActual: 0, totalProductos: 0 };
+
+        categorySummaries[categoryName] = buildPredictiveCategorySummary({
+          values,
+          lastSaleAt: row.lastSaleAt,
+          stockActual: stockInfo.stockActual,
+          totalProducts: stockInfo.totalProductos,
+          generatedAt: today,
+        });
+      });
+
+    const productBreakdown = {};
+    Array.from(productRows.values())
+      .sort((left, right) => {
+        const byCategory = left.category.localeCompare(right.category, "es");
+        if (byCategory !== 0) return byCategory;
+        return left.nombre.localeCompare(right.nombre, "es");
+      })
+      .forEach((row) => {
+        const values = monthKeys.map((monthKey) => Number(row.monthlySales.get(monthKey) || 0));
+        const summary = buildPredictiveProductSummary({
+          productId: row.productId,
+          nombre: row.nombre,
+          marca: row.marca,
+          values,
+          lastSaleAt: row.lastSaleAt,
+          stockActual: row.stockActual,
+        });
+
+        if (!productBreakdown[row.category]) {
+          productBreakdown[row.category] = [];
+        }
+
+        productBreakdown[row.category].push(summary);
+      });
+
+    Object.keys(productBreakdown).forEach((categoryName) => {
+      productBreakdown[categoryName].sort((left, right) => {
+        if (right.projected3Months !== left.projected3Months) {
+          return right.projected3Months - left.projected3Months;
+        }
+        return right.totalUnits - left.totalUnits;
+      });
+    });
+
+    const alerts = buildPredictiveAlerts(categorySummaries, productBreakdown);
+
+    const latestRecordedSaleAt = salesResult.reduce((latest, row) => {
+      if (!row?.ultimaVentaAt) return latest;
+      if (!latest || new Date(row.ultimaVentaAt) > new Date(latest)) {
+        return row.ultimaVentaAt;
+      }
+      return latest;
+    }, null);
+
+    return res.json({
+      meta: {
+        generatedAt: today.toISOString(),
+        model: "Regresion lineal simple",
+        monthsWindow: 12,
+        latestRecordedSaleAt: latestRecordedSaleAt ? new Date(latestRecordedSaleAt).toISOString() : null,
+      },
+      sales: formattedSales,
+      categorySummaries,
+      productBreakdown,
+      alerts,
+    });
+  } catch(error) {
+    console.error("Error en /sales/predictive:", error);
+    return res.status(500).json({ errors: ["No se pudo generar la predicción."] });
+  }
 });
 
 router.post("/sales", async (req, res) => {
@@ -875,6 +1506,7 @@ router.post("/sales", async (req, res) => {
 
     product.stock = stockActual;
     await product.save();
+    recordRecentOperation({ collection: "productos", type: "update" });
 
     await InventoryMovement.create({
       producto: product.nombre,
@@ -884,6 +1516,7 @@ router.post("/sales", async (req, res) => {
       stockAnterior,
       stockActual,
     });
+    recordRecentOperation({ collection: "movimientos_inventario", type: "insert" });
   }
 
   const sale = await Sale.create({
@@ -895,9 +1528,97 @@ router.post("/sales", async (req, res) => {
     items: saleItems,
     subtotal,
     total: subtotal,
+    estado: "Activa",
   });
+  recordRecentOperation({ collection: "ventas", type: "insert" });
 
   return res.status(201).json({ sale: mapSale(sale.toObject()) });
+});
+
+router.post("/sales/:id/cancel", async (req, res) => {
+  const saleId = sanitizeText(req.params.id);
+  const motivoAnulacion = sanitizeText(req.body.motivo);
+
+  if (!isValidId(saleId)) {
+    return res.status(400).json({ errors: ["Venta invalida."] });
+  }
+
+  if (!motivoAnulacion) {
+    return res.status(400).json({ errors: ["Debes indicar el motivo de anulacion."] });
+  }
+
+  const sale = await Sale.findById(saleId);
+  if (!sale) {
+    return res.status(404).json({ errors: ["Venta no encontrada."] });
+  }
+
+  if ((sale.estado || "Activa") === "Anulada") {
+    return res.status(400).json({ errors: ["La venta ya fue anulada."] });
+  }
+
+  const saleItems = Array.isArray(sale.items) ? sale.items : [];
+  if (!saleItems.length) {
+    return res.status(400).json({ errors: ["La venta no tiene productos para revertir."] });
+  }
+
+  const productIds = saleItems
+    .map((item) => String(item?.productId || ""))
+    .filter((productId) => isValidId(productId));
+
+  if (productIds.length !== saleItems.length) {
+    return res.status(400).json({ errors: ["La venta contiene productos invalidos y no se puede anular."] });
+  }
+
+  const products = await Product.find({ _id: { $in: productIds } });
+  const productsById = new Map(products.map((product) => [String(product._id), product]));
+  if (productsById.size !== productIds.length) {
+    return res.status(404).json({ errors: ["Uno o mas productos de la venta ya no existen."] });
+  }
+
+  const usuario =
+    sanitizeText(req.admin.username) ||
+    sanitizeText(req.admin.correo) ||
+    "Admin";
+
+  for (const item of saleItems) {
+    const product = productsById.get(String(item.productId));
+    if (!product) continue;
+
+    const cantidad = Number(item.cantidad || 0);
+    const stockAnterior = Number(product.stock || 0);
+    const stockActual = stockAnterior + cantidad;
+
+    product.stock = stockActual;
+    await product.save();
+    recordRecentOperation({ collection: "productos", type: "update" });
+
+    await InventoryMovement.create({
+      productId: product._id,
+      producto: product.nombre,
+      marca: product.marca || "",
+      categoria: product.categoria || "",
+      cantidadMedida:
+        Number.isFinite(Number(product.cantidadMedida)) && Number(product.cantidadMedida) > 0
+          ? Number(product.cantidadMedida)
+          : undefined,
+      unidadMedida: product.unidadMedida || "",
+      accion: "Entrada",
+      cantidad,
+      usuario,
+      stockAnterior,
+      stockActual,
+    });
+    recordRecentOperation({ collection: "movimientos_inventario", type: "insert" });
+  }
+
+  sale.estado = "Anulada";
+  sale.anuladaAt = new Date();
+  sale.anuladaPor = usuario;
+  sale.motivoAnulacion = motivoAnulacion;
+  await sale.save();
+  recordRecentOperation({ collection: "ventas", type: "update" });
+
+  return res.json({ sale: mapSale(sale.toObject()) });
 });
 
 router.get("/promotions", async (_req, res) => {
@@ -905,11 +1626,59 @@ router.get("/promotions", async (_req, res) => {
   return res.json({ promotions: promotions.map(mapId) });
 });
 
+router.get("/home-highlights", async (_req, res) => {
+  const [products, services, promotions] = await Promise.all([
+    Product.find().sort({ destacadoInicio: -1, createdAt: -1 }).lean(),
+    Service.find().sort({ destacadoInicio: -1, createdAt: -1 }).lean(),
+    Promotion.find().sort({ destacadoInicio: -1, createdAt: -1 }).lean(),
+  ]);
+
+  return res.json({
+    products: products.map(mapId),
+    services: services.map(mapId),
+    promotions: promotions.map(mapId),
+  });
+});
+
+router.put("/home-highlights", async (req, res) => {
+  const productIds = normalizeObjectIdList(req.body.productIds);
+  const serviceIds = normalizeObjectIdList(req.body.serviceIds);
+  const promotionIds = normalizeObjectIdList(req.body.promotionIds);
+
+  await Promise.all([
+    Product.updateMany({}, { $set: { destacadoInicio: false } }),
+    Service.updateMany({}, { $set: { destacadoInicio: false } }),
+    Promotion.updateMany({}, { $set: { destacadoInicio: false } }),
+  ]);
+
+  await Promise.all([
+    productIds.length
+      ? Product.updateMany({ _id: { $in: productIds } }, { $set: { destacadoInicio: true } })
+      : Promise.resolve(),
+    serviceIds.length
+      ? Service.updateMany({ _id: { $in: serviceIds } }, { $set: { destacadoInicio: true } })
+      : Promise.resolve(),
+    promotionIds.length
+      ? Promotion.updateMany({ _id: { $in: promotionIds } }, { $set: { destacadoInicio: true } })
+      : Promise.resolve(),
+  ]);
+
+  return res.json({
+    message: "Destacados de inicio actualizados.",
+    summary: {
+      products: productIds.length,
+      services: serviceIds.length,
+      promotions: promotionIds.length,
+    },
+  });
+});
+
 router.post("/promotions", async (req, res) => {
   const titulo = sanitizeText(req.body.titulo);
   const descripcion = sanitizeText(req.body.descripcion);
   const descuento = sanitizeText(req.body.descuento);
   const estado = sanitizeState(req.body.estado);
+  const destacadoInicio = parseBooleanFlag(req.body.destacadoInicio, false);
 
   const errors = [];
   if (!titulo) errors.push("Titulo es obligatorio.");
@@ -921,6 +1690,7 @@ router.post("/promotions", async (req, res) => {
     descripcion,
     descuento,
     estado,
+    destacadoInicio,
   });
 
   return res.status(201).json({ promotion: mapId(promotion.toObject()) });
@@ -941,6 +1711,7 @@ router.put("/promotions/:id", async (req, res) => {
   const descripcion = sanitizeText(req.body.descripcion);
   const descuento = sanitizeText(req.body.descuento);
   const estado = sanitizeState(req.body.estado);
+  const destacadoInicio = parseBooleanFlag(req.body.destacadoInicio, current.destacadoInicio);
 
   const errors = [];
   if (!titulo) errors.push("Titulo es obligatorio.");
@@ -951,6 +1722,7 @@ router.put("/promotions/:id", async (req, res) => {
   current.descripcion = descripcion;
   current.descuento = descuento;
   current.estado = estado;
+  current.destacadoInicio = destacadoInicio;
   await current.save();
 
   return res.json({ promotion: mapId(current.toObject()) });

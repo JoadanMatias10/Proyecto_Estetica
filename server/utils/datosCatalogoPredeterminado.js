@@ -1,4 +1,4 @@
-const SERVICE_SEGMENTS = ["Mujer", "Hombre", "Nino"];
+const { SERVICE_SEGMENTS, normalizeServiceSegment } = require("./serviceSegments");
 
 const CAROUSEL_BG_OPTIONS = [
   "from-rose-400 to-violet-500",
@@ -135,7 +135,10 @@ const DEFAULT_SERVICE_CATEGORIES = [
   { nombre: "Peinado", segmento: "Mujer", estado: "Activa", descripcion: "Peinados para distintas ocasiones." },
   { nombre: "Cortes", segmento: "Hombre", estado: "Activa", descripcion: "Cortes para hombre." },
   { nombre: "Cortes", segmento: "Nino", estado: "Activa", descripcion: "Cortes para nino." },
-];
+].map((item) => ({
+  ...item,
+  segmento: normalizeServiceSegment(item.segmento),
+}));
 
 const DEFAULT_SERVICES = [
   {
@@ -258,7 +261,10 @@ const DEFAULT_SERVICES = [
     imagen: "",
     imagenNombre: "",
   },
-];
+].map((item) => ({
+  ...item,
+  segmento: normalizeServiceSegment(item.segmento),
+}));
 
 const DEFAULT_COMPANY_INFO = {
   key: "main",

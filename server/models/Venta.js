@@ -21,11 +21,16 @@ const saleSchema = new mongoose.Schema(
     items: { type: [saleItemSchema], default: [], validate: [(value) => Array.isArray(value) && value.length > 0, "La venta debe tener al menos un item."] },
     subtotal: { type: Number, required: true, min: 0 },
     total: { type: Number, required: true, min: 0 },
+    estado: { type: String, enum: ["Activa", "Anulada"], default: "Activa" },
+    anuladaAt: { type: Date, default: null },
+    anuladaPor: { type: String, default: "", trim: true },
+    motivoAnulacion: { type: String, default: "", trim: true },
   },
   { timestamps: true, collection: "ventas" }
 );
 
 saleSchema.index({ createdAt: -1 });
+saleSchema.index({ estado: 1, createdAt: -1 });
 saleSchema.index({ usuario: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Sale", saleSchema);

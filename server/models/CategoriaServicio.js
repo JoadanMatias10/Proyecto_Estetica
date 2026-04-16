@@ -1,9 +1,10 @@
 const mongoose = require("mongoose");
+const { SERVICE_SEGMENTS, normalizeServiceSegment } = require("../utils/serviceSegments");
 
 const serviceCategorySchema = new mongoose.Schema(
   {
     nombre: { type: String, required: true, trim: true },
-    segmento: { type: String, enum: ["Mujer", "Hombre", "Nino"], required: true },
+    segmento: { type: String, enum: SERVICE_SEGMENTS, required: true, set: normalizeServiceSegment },
     estado: { type: String, enum: ["Activa", "Inactiva"], default: "Activa" },
     descripcion: { type: String, default: "", trim: true },
   },

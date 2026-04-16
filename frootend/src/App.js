@@ -45,6 +45,7 @@ import ConfigurarAccesoCuenta from "./Publico/Login/ConfigurarAccesoCuenta";
 
 // Servicios
 import ConsultaServicio from "./Publico/Servicios/ConsultaServicio";
+import DetalleServicio from "./Publico/Servicios/DetalleServicio";
 
 // Información de la empresa
 import Contactos from "./Publico/InformacionEmpresa/Contactos";
@@ -71,6 +72,7 @@ import ReprogramarCita from "./Cliente/Citas/ReprogramarCita";
 import CalendarioDisponibilidad from "./Cliente/Citas/CalendarioDisponibilidad";
 
 import ConsultaServicioCliente from "./Cliente/Servicios/ConsultaServicioCliente";
+import DetalleServicioCliente from "./Cliente/Servicios/DetalleServicioCliente";
 import PagoServicios from "./Cliente/Servicios/PagoServicios";
 
 import RecordarCita from "./Cliente/Notificaciones/RecordarCita";
@@ -98,11 +100,14 @@ import HistorialVentas from "./Administrador/Ventas/HistorialVentas";
 import GestionPersonal from "./Administrador/Personal/GestionPersonal";
 import GenerarReportes from "./Administrador/Reportes/GenerarReportes";
 import InformesEstadisticos from "./Administrador/Reportes/InformesEstadisticos";
+import ModeloPredictivo from "./Administrador/Reportes/ModeloPredictivo";
 import InformacionEmpresa from "./Administrador/Empresa/InformacionEmpresa";
 import ControlStock from "./Administrador/Inventario/ControlStock";
 import CategoriasServicios from "./Administrador/Servicios/CategoriasServicios";
 import GestionCarrusel from "./Administrador/Marketing/GestionCarrusel";
+import GestionDestacadosInicio from "./Administrador/Marketing/GestionDestacadosInicio";
 import GestionRespaldos from "./Administrador/Respaldos/GestionRespaldos";
+import MonitoreoBD from "./Administrador/Monitoreo/MonitoreoBD";
 
 export default function App() {
   return (
@@ -121,6 +126,7 @@ export default function App() {
         <Route path="/restablecer-contrasena" element={<ConfigurarAccesoCuenta mode="reset" />} />
 
         <Route path="/servicios" element={<ConsultaServicio />} />
+        <Route path="/servicios/:id" element={<DetalleServicio />} />
 
         <Route path="/contactos" element={<Contactos />} />
         <Route path="/quienes-somos" element={<QuienesSomos />} />
@@ -151,6 +157,7 @@ export default function App() {
         <Route path="citas/calendario" element={<CalendarioDisponibilidad />} />
 
         <Route path="servicios" element={<ConsultaServicioCliente />} />
+        <Route path="servicios/:id" element={<DetalleServicioCliente />} />
         <Route path="servicios/pago" element={<PagoServicios />} />
 
         <Route path="notificaciones" element={<RecordarCita />} />
@@ -171,16 +178,19 @@ export default function App() {
         <Route path="productos" element={<CatalogoProductosAdmin />} />
         <Route path="productos/categorias" element={<CategoriasProductos />} />
         <Route path="productos/marcas" element={<MarcasProductos />} />
+        <Route path="destacados-inicio" element={<GestionDestacadosInicio />} />
         <Route path="ventas" element={<HistorialVentas />} />
         <Route path="ventas/nueva" element={<RegistrarVenta />} />
         <Route path="personal" element={<GestionPersonal />} />
         <Route path="reportes/generar" element={<GenerarReportes />} />
         <Route path="reportes/estadisticas" element={<InformesEstadisticos />} />
+        <Route path="reportes/predictivo" element={<ModeloPredictivo />} />
         <Route path="empresa" element={<InformacionEmpresa />} />
         <Route path="carrusel" element={<GestionCarrusel />} />
         <Route path="marketing/carrusel" element={<GestionCarrusel />} />
         <Route path="inventario" element={<ControlStock />} />
         <Route path="respaldos" element={<GestionRespaldos />} />
+        <Route path="monitoreo" element={<MonitoreoBD />} />
       </Route>
     </Routes>
 

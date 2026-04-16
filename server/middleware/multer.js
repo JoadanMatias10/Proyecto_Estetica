@@ -22,10 +22,12 @@ function createCloudinaryUpload(folder) {
 
 const productUpload = createCloudinaryUpload("productos");
 const serviceUpload = createCloudinaryUpload("servicios");
+const carouselUpload = createCloudinaryUpload("carrusel");
 
 module.exports = {
   MAX_IMAGE_BYTES,
   createCloudinaryUpload,
   productUpload,
   serviceUpload,
+  carouselUpload,
 };

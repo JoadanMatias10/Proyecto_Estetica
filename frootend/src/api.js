@@ -1,4 +1,6 @@
 const normalizeBaseUrl = (value) => {
+  // Some local Windows setups intercept localhost:5000; a loopback alias still reaches the Express server.
+  //const base = (value || "http://127.0.0.2:5000").trim().replace(/\/+$/, "");
   const base = (value || "http://localhost:5000").trim().replace(/\/+$/, "");
   if (base.endsWith("/api")) return base;
   return `${base}/api`;
@@ -29,7 +31,10 @@ export const endpoints = {
   publicProductCategories: buildUrl("/public/product-categories"),
   publicProductBrands: buildUrl("/public/product-brands"),
   publicServices: buildUrl("/public/services"),
+  publicServiceById: (id) => buildUrl(`/public/services/${id}`),
   publicServiceCategories: buildUrl("/public/service-categories"),
+  publicPromotions: buildUrl("/public/promotions"),
+  publicHomeHighlights: buildUrl("/public/home-highlights"),
   publicCarousel: buildUrl("/public/carousel"),
 
   adminProducts: buildUrl("/admin/products"),
@@ -48,6 +53,7 @@ export const endpoints = {
   adminCarousel: buildUrl("/admin/carousel"),
   adminCarouselById: (id) => buildUrl(`/admin/carousel/${id}`),
   adminCarouselReorder: buildUrl("/admin/carousel/reorder"),
+  adminHomeHighlights: buildUrl("/admin/home-highlights"),
   adminStats: (period = "Mes") => buildUrl(`/admin/stats?period=${encodeURIComponent(period)}`),
   adminReports: ({ tipo = "Todos", desde = "", hasta = "" } = {}) =>
     buildUrl(`/admin/reports?tipo=${encodeURIComponent(tipo)}&desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`),
@@ -55,9 +61,11 @@ export const endpoints = {
   adminPromotionById: (id) => buildUrl(`/admin/promotions/${id}`),
   adminSales: ({ desde = "", hasta = "" } = {}) =>
     buildUrl(`/admin/sales?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`),
+  adminSalesPredictive: buildUrl("/admin/sales/predictive"),
+  adminSaleCancel: (id) => buildUrl(`/admin/sales/${encodeURIComponent(id)}/cancel`),
   adminInventoryMovements: ({ action = "Todos" } = {}) =>
     buildUrl(`/admin/inventory/movements?action=${encodeURIComponent(action)}`),
-  adminInventoryAlerts: (threshold = 10) =>
+  adminInventoryAlerts: (threshold = 5) =>
     buildUrl(`/admin/inventory/alerts?threshold=${encodeURIComponent(threshold)}`),
   adminStaff: buildUrl("/admin/staff"),
   adminStaffById: (id) => buildUrl(`/admin/staff/${id}`),
@@ -67,14 +75,23 @@ export const endpoints = {
   adminBackupCreate: buildUrl("/admin/respaldos/crear"),
   adminBackupSchedule: buildUrl("/admin/respaldos/programacion"),
   adminBackupDownload: (id) => buildUrl(`/admin/respaldos/descargar/${encodeURIComponent(id || "")}`),
+  adminDatabaseMonitor: buildUrl("/admin/database-monitor"),
+  adminDatabaseMonitorSummary: buildUrl("/admin/database-monitor/summary"),
+  adminDatabaseMonitorActivity: buildUrl("/admin/database-monitor/activity"),
+  adminDatabaseMonitorHealth: buildUrl("/admin/database-monitor/health"),
+  adminDatabaseMonitorExplainProducts: buildUrl("/admin/database-monitor/explain/products"),
+  adminDatabaseMonitorExplainCitas: buildUrl("/admin/database-monitor/explain/citas"),
+  adminDatabaseMonitorExplainServices: buildUrl("/admin/database-monitor/explain/services"),
+  adminDatabaseMonitorStream: buildUrl("/admin/database-monitor/stream"),
 };
 
 export async function requestJson(url, options = {}) {
-  const { method = "GET", body, token, headers = {} } = options;
+  const { method = "GET", body, token, headers = {}, signal } = options;
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
 
   const response = await fetch(url, {
     method,
+    signal,
     headers: {
       ...(body && !isFormData ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

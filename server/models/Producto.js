@@ -14,11 +14,13 @@ const productSchema = new mongoose.Schema(
     imagenPublicId: { type: String, default: "", trim: true },
     imagenNombre: { type: String, default: "", trim: true },
     rating: { type: Number, default: 4.8, min: 0, max: 5 },
+    destacadoInicio: { type: Boolean, default: false },
   },
   { timestamps: true, collection: "productos" }
 );
 
 productSchema.index({ nombre: 1 });
 productSchema.index({ categoria: 1 });
+productSchema.index({ destacadoInicio: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Product", productSchema);
