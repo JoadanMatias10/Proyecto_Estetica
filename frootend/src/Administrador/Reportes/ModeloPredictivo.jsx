@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import { endpoints, requestJson } from "../../api";
 import {
@@ -149,12 +149,6 @@ function sumProjectedDemand(ys, months) {
     (sum, value) => sum + value,
     0
   );
-}
-
-function normalizeMonthlySeries(values, months = 12) {
-  const series = Array.isArray(values) ? values.map((value) => Number(value || 0)) : [];
-  if (series.length >= months) return series.slice(series.length - months);
-  return [...Array.from({ length: months - series.length }, () => 0), ...series];
 }
 
 function buildPredictionSnapshot(values) {
@@ -1112,6 +1106,14 @@ function KpiCardWithSparkline({ label, value, prev, color, sparklineData }) {
           {fmtNum(value)}
           <span className="text-sm font-medium text-slate-400 ml-1">uds.</span>
         </div>
+        {prev ? (
+          <span className="text-[11px] font-semibold text-slate-400">
+            Diferencia: {fmtNum(diff)} uds.
+          </span>
+        ) : null}
+        {Array.isArray(sparklineData) && sparklineData.length > 1 ? (
+          <Sparkline data={sparklineData} color={color.solid} />
+        ) : null}
       </div>
     </DashboardCard>
   );
@@ -1721,9 +1723,12 @@ export default function ModeloPredictivo() {
           : granularity === "weekly" ? buildCategoryDataWeekly(sales, endD)
             : buildCategoryDataDaily(sales, endD);
 
+        const categoryKeys = Object.keys(built);
         setCategoryData(built);
-        if (Object.keys(built).length > 0) {
-          if (!selected || !built[selected]) setSelected(Object.keys(built)[0]);
+        if (categoryKeys.length > 0) {
+          setSelected((currentSelected) => (
+            currentSelected && built[currentSelected] ? currentSelected : categoryKeys[0]
+          ));
         } else {
           setSelected(null);
           setSelectedProduct(null);
@@ -1735,7 +1740,7 @@ export default function ModeloPredictivo() {
       }
     };
     loadSales();
-  }, [targetDateStr, granularity]);
+  }, [targetDateStr, granularity, endD]);
 
   function buildCategoryData(sales, refDate) {
     const months = Array.from({ length: 12 }, (_, i) => {
@@ -1912,8 +1917,20 @@ export default function ModeloPredictivo() {
     if (selectedProductSummary) return selectedProductSummary;
     return categorySummaries[selected] || { stockActual: 0, confidence: { level: "Baja", score: 0 } };
   }, [selected, selectedProductSummary, categorySummaries]);
+  const confidencePalette = getConfidencePalette(selectedSummary.confidence?.level || "Baja");
 
   if (loading) return <LoadingSpinner text="Cargando modelo..." />;
+  if (error) {
+    return (
+      <DashboardCard className="p-6 border border-rose-100 bg-rose-50">
+        <PanelIntro
+          eyebrow="Error"
+          title="No se pudieron cargar los datos predictivos"
+          description={error}
+        />
+      </DashboardCard>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -1974,6 +1991,26 @@ export default function ModeloPredictivo() {
               onChange={(e) => setEndDateStr(e.target.value)}
               className="bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 p-1 shadow-sm focus:ring-1 focus:ring-indigo-300 outline-none"
             />
+          </div>
+
+          <div className="flex bg-slate-100 p-1 rounded-xl items-center gap-1 border border-slate-200">
+            {[
+              { value: "daily", label: "DIA" },
+              { value: "weekly", label: "SEM" },
+              { value: "monthly", label: "MES" },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setGranularity(option.value)}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all ${granularity === option.value
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-slate-400 hover:text-slate-600"
+                  }`}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
 
         </div>
@@ -2069,6 +2106,16 @@ export default function ModeloPredictivo() {
         />
       </DashboardCard>
 
+      {selectedProductSummary ? (
+        <ProductIntelligencePanel
+          product={selectedProductSummary}
+          rawSales={rawSales}
+          rawProductSales={rawProductSales}
+          today={today}
+          color={selColor}
+        />
+      ) : null}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DashboardCard className="p-6">
           <PanelIntro
@@ -2117,9 +2164,57 @@ export default function ModeloPredictivo() {
             color="#f59e0b"
           />
         </div>
+        <div
+          className="mt-6 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+          style={{ background: confidencePalette.bg, border: `1px solid ${confidencePalette.border}` }}
+        >
+          <span className="text-xs font-black uppercase tracking-widest" style={{ color: confidencePalette.text }}>
+            Confianza del modelo: {selectedSummary.confidence?.level || "Baja"}
+          </span>
+          <span className="text-sm font-bold" style={{ color: confidencePalette.text }}>
+            {fmtPercent(selectedSummary.confidence?.score || 0)}
+          </span>
+        </div>
       </DashboardCard>
 
       {/* ── Datos de Entrada del Modelo (Memoria de Cálculo) ── */}
+      {predictiveAlerts.length > 0 ? (
+        <DashboardCard className="p-6">
+          <PanelIntro
+            eyebrow="Alertas"
+            title="Alertas predictivas"
+            description="Riesgos calculados a partir de demanda, stock y confianza del modelo."
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {predictiveAlerts.slice(0, 4).map((alert) => {
+              const palette = getAlertPalette(alert.severity);
+              return (
+                <button
+                  key={alert.id || alert.title}
+                  type="button"
+                  onClick={() => alert.category && handleCategoryChange(alert.category)}
+                  className="text-left rounded-xl px-4 py-3 transition hover:-translate-y-0.5 hover:shadow-sm"
+                  style={{ background: palette.bg, border: `1px solid ${palette.border}` }}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: palette.text }}>
+                      {alert.severity || "Media"}
+                    </span>
+                    <span className="text-xs font-bold" style={{ color: palette.text }}>
+                      {alert.metric || ""}
+                    </span>
+                  </div>
+                  <h3 className="mt-2 text-sm font-black text-slate-800">{alert.title}</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">{alert.description}</p>
+                </button>
+              );
+            })}
+          </div>
+        </DashboardCard>
+      ) : null}
+
+      <ActionsPanel summary={selectedSummary} color={selColor} horizon={horizon} />
+
       <ModelInputData
         stockInitial={selectedSummary.stockActual || 0}
         salesInRange={selHist.reduce((a, v) => a + v, 0)}
