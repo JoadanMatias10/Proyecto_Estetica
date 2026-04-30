@@ -488,33 +488,46 @@ function buildPredictiveMonthKeys(referenceDate, count = 12) {
   });
 }
 
-function linearRegressionSeries(values) {
-  const series = Array.isArray(values) ? values.map((value) => Number(value || 0)) : [];
-  const n = series.length;
-  if (!n) return { m: 0, b: 0 };
+// ── Motor predictivo: Modelo de Crecimiento Exponencial ──────────────────
+// Basado en la ecuación diferencial dP/dt = kP → solución: P(t) = P0·e^(k·t)
+// (MEMORIA DE CALCULO BINA 9, secciones 1.3–1.5)
+function exponentialGrowthParams(values) {
+  const series = Array.isArray(values) ? values.map((v) => Number(v || 0)) : [];
 
-  const xs = series.map((_, index) => index);
-  const sumX = xs.reduce((total, value) => total + value, 0);
-  const sumY = series.reduce((total, value) => total + value, 0);
-  const sumXY = xs.reduce((total, value, index) => total + value * series[index], 0);
-  const sumX2 = xs.reduce((total, value) => total + value * value, 0);
-  const denominator = n * sumX2 - sumX * sumX;
+  // P0: primer mes con venta registrada
+  const p0Idx = series.findIndex((v) => v > 0);
+  if (p0Idx === -1) return { p0: 0, k: 0, p0Idx: 0, valid: false };
 
-  if (!denominator) {
-    return { m: 0, b: sumY / n };
+  const p0 = series[p0Idx];
+
+  // Punto de referencia: último mes con venta después de p0Idx
+  let refIdx = -1;
+  for (let i = series.length - 1; i > p0Idx; i -= 1) {
+    if (series[i] > 0) { refIdx = i; break; }
   }
 
-  return {
-    m: (n * sumXY - sumX * sumY) / denominator,
-    b: (sumY - ((n * sumXY - sumX * sumY) / denominator) * sumX) / n,
-  };
+  if (refIdx === -1) return { p0, k: 0, p0Idx, valid: true };
+
+  const pt = series[refIdx];
+  const t = refIdx - p0Idx; // meses entre P0 y el punto de referencia
+
+  if (t === 0 || p0 <= 0 || pt <= 0) return { p0, k: 0, p0Idx, valid: true };
+
+  // k = ln(Pt/P0) / t  →  redondeado a 4 decimales (igual que cálculo a mano)
+  const kRaw = Math.log(pt / p0) / t;
+  const k = Math.round(kRaw * 10000) / 10000;
+
+  return { p0, k, p0Idx, valid: true };
 }
 
 function predictSeriesValue(values, stepsAhead = 1) {
-  const series = Array.isArray(values) ? values.map((value) => Number(value || 0)) : [];
-  const { m, b } = linearRegressionSeries(series);
-  const nextX = series.length - 1 + stepsAhead;
-  return Math.max(0, Math.round(m * nextX + b));
+  const series = Array.isArray(values) ? values.map((v) => Number(v || 0)) : [];
+  const { p0, k, p0Idx, valid } = exponentialGrowthParams(series);
+  if (!valid || p0 === 0) return 0;
+
+  // t futuro = distancia desde P0 hasta el mes proyectado
+  const tFuture = (series.length - 1 - p0Idx) + stepsAhead;
+  return Math.max(0, Math.round(p0 * Math.exp(k * tFuture)));
 }
 
 function sumPredictedDemand(values, months) {
@@ -596,7 +609,8 @@ function buildPredictiveCategorySummary({
   const nextMonth = predictSeriesValue(series, 1);
   const next3Months = sumPredictedDemand(series, 3);
   const next6Months = sumPredictedDemand(series, 6);
-  const { m: trendSlope } = linearRegressionSeries(series);
+  const { k: trendSlope, p0, valid: modelValid } = exponentialGrowthParams(series);
+  const modelFormula = modelValid && p0 > 0 ? `P(t) = ${p0}·e^(${trendSlope}·t)` : null;
   const averageProjectedMonthly = next3Months > 0 ? next3Months / 3 : 0;
   const stockCoverageMonths = averageProjectedMonthly > 0
     ? roundMetric(stockActual / averageProjectedMonthly, 1)
@@ -621,7 +635,9 @@ function buildPredictiveCategorySummary({
     generatedAt: generatedAt.toISOString(),
     totalProducts,
     stockActual,
-    trendSlope: roundMetric(trendSlope, 2),
+    k: trendSlope,
+    p0,
+    modelFormula,
     projectedNextMonth: nextMonth,
     projected3Months: next3Months,
     projected6Months: next6Months,
@@ -641,14 +657,21 @@ function buildPredictiveProductSummary({
   marca,
   values,
   lastSaleAt,
+  firstSaleAt,
   stockActual,
+  generatedAt,
+  imagen,
 }) {
   const series = Array.isArray(values) ? values.map((value) => Number(value || 0)) : [];
+  const monthsAnalyzed = series.length;
   const monthsWithData = series.filter((value) => value > 0).length;
   const totalUnits = series.reduce((total, value) => total + value, 0);
+  const lastMonthSales = Number(series[series.length - 1] || 0);
   const projectedNextMonth = predictSeriesValue(series, 1);
   const projected3Months = sumPredictedDemand(series, 3);
   const projected6Months = sumPredictedDemand(series, 6);
+  const { k: trendSlope, p0, valid: modelValid } = exponentialGrowthParams(series);
+  const modelFormula = modelValid && p0 > 0 ? `P(t) = ${p0}*e^(${trendSlope}*t)` : null;
   const avgProjectedMonthly = projected3Months > 0 ? projected3Months / 3 : 0;
   const stockCoverageMonths = avgProjectedMonthly > 0
     ? roundMetric(stockActual / avgProjectedMonthly, 1)
@@ -657,23 +680,42 @@ function buildPredictiveProductSummary({
   const riskBreakage = stockActual < projectedNextMonth || (stockCoverageMonths !== null && stockCoverageMonths < 1.5);
   const riskOverstock = stockActual > 0 && (projected3Months === 0 || (stockCoverageMonths !== null && stockCoverageMonths > 6));
   const lowRotation = totalUnits <= 6 && monthsWithData <= 2 && stockActual > 0;
+  const { errorRate, evaluatedMonths } = calculatePredictiveError(series);
+  const confidence = calculatePredictiveConfidence({
+    monthsWithData,
+    errorRate,
+    evaluatedMonths,
+    totalUnits,
+  });
 
   return {
     productId: productId ? String(productId) : "",
     nombre: String(nombre || "Producto sin nombre"),
     marca: String(marca || "Sin marca"),
+    monthlySeries: series,
+    monthsAnalyzed,
     totalUnits,
     monthsWithData,
+    lastMonthSales,
     lastSaleAt: lastSaleAt ? new Date(lastSaleAt).toISOString() : null,
+    generatedAt: generatedAt ? new Date(generatedAt).toISOString() : null,
     stockActual,
+    k: trendSlope,
+    p0,
+    modelFormula,
     projectedNextMonth,
     projected3Months,
     projected6Months,
+    errorRate,
+    evaluatedMonths,
+    confidence,
     stockCoverageMonths,
     suggestedRestock,
     riskBreakage,
     riskOverstock,
     lowRotation,
+    imagen,
+    firstSaleAt: firstSaleAt ? new Date(firstSaleAt).toISOString() : null,
   };
 }
 
@@ -1174,11 +1216,11 @@ router.get("/sales", async (req, res) => {
 
 router.get("/sales/predictive", async (req, res) => {
   try {
-    const today = new Date();
+    const today = req.query.date ? new Date(`${req.query.date}T12:00:00`) : new Date();
     const twelveMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 11, 1);
     
     const salesPipeline = [
-      { $match: { estado: "Activa", createdAt: { $gte: twelveMonthsAgo } } },
+      { $match: { estado: { $ne: "Anulada" }, createdAt: { $gte: twelveMonthsAgo } } },
       { $unwind: "$items" },
       {
         $lookup: {
@@ -1192,8 +1234,9 @@ router.get("/sales/predictive", async (req, res) => {
       {
         $group: {
           _id: {
-            year: { $year: "$createdAt" },
-            month: { $month: "$createdAt" },
+            year: { $year: { date: "$createdAt", timezone: "America/Mexico_City" } },
+            month: { $month: { date: "$createdAt", timezone: "America/Mexico_City" } },
+            day: { $dayOfMonth: { date: "$createdAt", timezone: "America/Mexico_City" } },
             categoria: { $ifNull: ["$productoDetails.categoria", "Otro"] },
           },
           cantidad: { $sum: "$items.cantidad" },
@@ -1210,7 +1253,7 @@ router.get("/sales/predictive", async (req, res) => {
     ];
 
     const productSalesPipeline = [
-      { $match: { estado: "Activa", createdAt: { $gte: twelveMonthsAgo } } },
+      { $match: { estado: { $ne: "Anulada" }, createdAt: { $gte: twelveMonthsAgo } } },
       { $unwind: "$items" },
       {
         $lookup: {
@@ -1224,8 +1267,9 @@ router.get("/sales/predictive", async (req, res) => {
       {
         $group: {
           _id: {
-            year: { $year: "$createdAt" },
-            month: { $month: "$createdAt" },
+            year: { $year: { date: "$createdAt", timezone: "America/Mexico_City" } },
+            month: { $month: { date: "$createdAt", timezone: "America/Mexico_City" } },
+            day: { $dayOfMonth: { date: "$createdAt", timezone: "America/Mexico_City" } },
             categoria: { $ifNull: ["$productoDetails.categoria", "Otro"] },
             productId: { $ifNull: ["$productoDetails._id", "$items.productId"] },
             nombre: { $ifNull: ["$productoDetails.nombre", "$items.producto"] },
@@ -1233,7 +1277,9 @@ router.get("/sales/predictive", async (req, res) => {
           },
           cantidad: { $sum: "$items.cantidad" },
           ultimaVentaAt: { $max: "$createdAt" },
+          primeraVentaAt: { $min: "$createdAt" },
           stockActual: { $max: { $ifNull: ["$productoDetails.stock", 0] } },
+          imagen: { $max: "$productoDetails.imagen" },
         },
       },
       {
@@ -1262,10 +1308,25 @@ router.get("/sales/predictive", async (req, res) => {
       Sale.aggregate(productSalesPipeline),
     ]);
 
+    const stockByProduct = new Map();
+    // No necesitamos stockByProduct de forma compleja si productRows ya tiene el stockActual del populate o aggregate.
+    // Pero para estar seguros, si stockResult tiene stock por categoria, lo usamos en stockByCategory.
+
     const formattedSales = salesResult.map((row) => ({
       categoria: row._id.categoria,
-      fecha: `${row._id.year}-${padMonthNumber(row._id.month)}`,
+      fecha: `${row._id.year}-${padMonthNumber(row._id.month)}-${String(row._id.day).padStart(2, "0")}`,
       cantidad: row.cantidad,
+    }));
+
+    const formattedProductSales = productSalesResult.map((row) => ({
+      productId: row._id.productId,
+      nombre: row._id.nombre,
+      categoria: row._id.categoria,
+      fecha: `${row._id.year}-${padMonthNumber(row._id.month)}-${String(row._id.day).padStart(2, "0")}`,
+      cantidad: row.cantidad,
+      ultimaVentaAt: row.ultimaVentaAt,
+      primeraVentaAt: row.primeraVentaAt,
+      imagen: row.imagen,
     }));
 
     const stockByCategory = new Map(
@@ -1290,9 +1351,10 @@ router.get("/sales/predictive", async (req, res) => {
         lastSaleAt: null,
       };
 
-      current.monthlySales.set(monthKey, Number(row.cantidad || 0));
+      const prevQty = current.monthlySales.get(monthKey) || 0;
+      current.monthlySales.set(monthKey, prevQty + Number(row.cantidad || 0));
 
-      if (!current.lastSaleAt || new Date(row.ultimaVentaAt) > new Date(current.lastSaleAt)) {
+      if (!current.lastSaleAt || (row.ultimaVentaAt && (!current.lastSaleAt || new Date(row.ultimaVentaAt) > new Date(current.lastSaleAt)))) {
         current.lastSaleAt = row.ultimaVentaAt;
       }
 
@@ -1311,14 +1373,20 @@ router.get("/sales/predictive", async (req, res) => {
         marca: String(row?._id?.marca || "Sin marca"),
         stockActual: Number(row.stockActual || 0),
         lastSaleAt: null,
+        firstSaleAt: null,
+        imagen: row.imagen || null,
         monthlySales: new Map(),
       };
 
-      current.monthlySales.set(monthKey, Number(row.cantidad || 0));
+      const prevQty = current.monthlySales.get(monthKey) || 0;
+      current.monthlySales.set(monthKey, prevQty + Number(row.cantidad || 0));
       current.stockActual = Number(row.stockActual || current.stockActual || 0);
 
-      if (!current.lastSaleAt || new Date(row.ultimaVentaAt) > new Date(current.lastSaleAt)) {
+      if (!current.lastSaleAt || (row.ultimaVentaAt && new Date(row.ultimaVentaAt) > new Date(current.lastSaleAt))) {
         current.lastSaleAt = row.ultimaVentaAt;
+      }
+      if (!current.firstSaleAt || (row.primeraVentaAt && new Date(row.primeraVentaAt) < new Date(current.firstSaleAt))) {
+        current.firstSaleAt = row.primeraVentaAt;
       }
 
       productRows.set(rowKey, current);
@@ -1355,7 +1423,10 @@ router.get("/sales/predictive", async (req, res) => {
           marca: row.marca,
           values,
           lastSaleAt: row.lastSaleAt,
+          firstSaleAt: row.firstSaleAt,
           stockActual: row.stockActual,
+          generatedAt: today,
+          imagen: row.imagen,
         });
 
         if (!productBreakdown[row.category]) {
@@ -1387,11 +1458,13 @@ router.get("/sales/predictive", async (req, res) => {
     return res.json({
       meta: {
         generatedAt: today.toISOString(),
-        model: "Regresion lineal simple",
+        model: "Crecimiento exponencial",
+        formula: "P(t) = P₀ · e^(k·t)",
         monthsWindow: 12,
         latestRecordedSaleAt: latestRecordedSaleAt ? new Date(latestRecordedSaleAt).toISOString() : null,
       },
       sales: formattedSales,
+      productSales: formattedProductSales,
       categorySummaries,
       productBreakdown,
       alerts,

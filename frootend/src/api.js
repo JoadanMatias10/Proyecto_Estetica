@@ -61,7 +61,7 @@ export const endpoints = {
   adminPromotionById: (id) => buildUrl(`/admin/promotions/${id}`),
   adminSales: ({ desde = "", hasta = "" } = {}) =>
     buildUrl(`/admin/sales?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`),
-  adminSalesPredictive: buildUrl("/admin/sales/predictive"),
+  adminSalesPredictive: (date) => buildUrl(date ? `/admin/sales/predictive?date=${encodeURIComponent(date)}` : "/admin/sales/predictive"),
   adminSaleCancel: (id) => buildUrl(`/admin/sales/${encodeURIComponent(id)}/cancel`),
   adminInventoryMovements: ({ action = "Todos" } = {}) =>
     buildUrl(`/admin/inventory/movements?action=${encodeURIComponent(action)}`),
