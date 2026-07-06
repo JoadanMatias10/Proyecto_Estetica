@@ -2,20 +2,27 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Logo from "../../img/Logo para una estéti.png";
 import ThemeToggle from "../ui/ThemeToggle";
+import { getStoredClientUser } from "../../utils/clientStore";
 
 export default function ClientHeader() {
   const navigate = useNavigate();
-  const [user, setUser] = useState({ nombre: "Cliente", correo: "cliente@correo.com" });
+  const [user, setUser] = useState(() => getStoredClientUser() || { nombre: "Cliente", correo: "cliente@correo.com" });
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.error("Error parsing user data");
-      }
-    }
+    const refreshUser = () => {
+      setUser(getStoredClientUser() || { nombre: "Cliente", correo: "cliente@correo.com" });
+    };
+
+    const handleClientStateChange = (event) => {
+      if (!event?.detail?.key || event.detail.key === "user") refreshUser();
+    };
+
+    window.addEventListener("client-state-change", handleClientStateChange);
+    window.addEventListener("storage", refreshUser);
+    return () => {
+      window.removeEventListener("client-state-change", handleClientStateChange);
+      window.removeEventListener("storage", refreshUser);
+    };
   }, []);
 
   const handleLogout = () => {

@@ -1,32 +1,32 @@
 import React, { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import AdminHeader from "./AdminHeader";
-import AdminSidebar from "./AdminSidebar";
+import EstilistaHeader from "./EstilistaHeader";
+import EstilistaSidebar from "./EstilistaSidebar";
 import Breadcrumbs from "../ui/Breadcrumbs";
 import LoadingSpinner from "../ui/LoadingSpinner";
 import { endpoints } from "../../api";
 
-export default function AdminLayout() {
+export default function EstilistaLayout() {
   const navigate = useNavigate();
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
-    const verifyAdminSession = async () => {
-      const adminToken = localStorage.getItem("adminToken") || localStorage.getItem("token");
-      const rawAdminUser = localStorage.getItem("adminUser") || localStorage.getItem("user");
+    const verifyEstilistaSession = async () => {
+      const token = localStorage.getItem("adminToken") || localStorage.getItem("token");
+      const rawUser = localStorage.getItem("adminUser") || localStorage.getItem("user");
 
-      if (!adminToken || !rawAdminUser) {
+      if (!token || !rawUser) {
         navigate("/login", { replace: true });
         return;
       }
 
       try {
-        const parsed = JSON.parse(rawAdminUser);
-        if (parsed?.role === "stylist") {
-          navigate("/estilista", { replace: true });
+        const parsed = JSON.parse(rawUser);
+        if (parsed?.role === "admin") {
+          navigate("/admin", { replace: true });
           return;
         }
-        if (!parsed || parsed.role !== "admin") {
+        if (!parsed || parsed.role !== "stylist") {
           navigate("/login", { replace: true });
           return;
         }
@@ -36,8 +36,8 @@ export default function AdminLayout() {
       }
 
       try {
-        const response = await fetch(endpoints.adminMe, {
-          headers: { Authorization: `Bearer ${adminToken}` },
+        const response = await fetch(endpoints.stylistMe, {
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         if (!response.ok) {
@@ -51,6 +51,7 @@ export default function AdminLayout() {
 
         const data = await response.json();
         localStorage.setItem("adminUser", JSON.stringify(data.user));
+        localStorage.setItem("user", JSON.stringify(data.user));
       } catch (_error) {
         localStorage.removeItem("adminToken");
         localStorage.removeItem("adminUser");
@@ -63,17 +64,17 @@ export default function AdminLayout() {
       }
     };
 
-    verifyAdminSession();
+    verifyEstilistaSession();
   }, [navigate]);
 
   if (checkingAuth) {
-    return <LoadingSpinner text="Validando acceso interno..." />;
+    return <LoadingSpinner text="Validando acceso..." />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-rose-50/50 to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 dark:text-white transition-colors duration-300">
-      <AdminHeader />
-      <AdminSidebar />
+    <div className="min-h-screen bg-gradient-to-br from-rose-50 via-rose-50/50 to-violet-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 dark:text-white transition-colors duration-300">
+      <EstilistaHeader />
+      <EstilistaSidebar />
       <div className="max-w-7xl mx-auto w-full p-4">
         <main className="min-h-[calc(100vh-5rem)] md:pl-24 transition-all duration-300">
           <Breadcrumbs />

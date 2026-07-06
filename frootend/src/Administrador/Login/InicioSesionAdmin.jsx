@@ -53,7 +53,7 @@ export default function InicioSesionAdmin() {
 
       localStorage.setItem("adminToken", data.token);
       localStorage.setItem("adminUser", JSON.stringify(data.user));
-      navigate("/admin");
+      navigate(data.user?.role === "stylist" ? "/estilista" : "/admin");
     } catch (_error) {
       setServerError("CRITICAL_ERROR");
     } finally {

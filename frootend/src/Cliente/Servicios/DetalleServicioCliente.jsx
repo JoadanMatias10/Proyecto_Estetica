@@ -143,12 +143,12 @@ export default function DetalleServicioCliente() {
           </div>
 
           <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Link to="/cliente/citas" className="block">
+            <Link to={`/cliente/citas?serviceId=${encodeURIComponent(service.id)}`} className="block">
               <button className="w-full h-14 rounded-2xl border-2 border-violet-200 bg-white text-sm font-bold uppercase tracking-[0.18em] text-violet-700 transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-50">
                 Agendar
               </button>
             </Link>
-            <Link to="/cliente/servicios/pago" className="block">
+            <Link to={`/cliente/servicios/pago?serviceId=${encodeURIComponent(service.id)}`} className="block">
               <button className="w-full h-14 rounded-2xl bg-violet-600 text-sm font-bold uppercase tracking-[0.18em] text-white shadow-lg shadow-violet-200 transition-all duration-300 hover:-translate-y-0.5 hover:bg-violet-700 hover:shadow-violet-300">
                 Pagar
               </button>

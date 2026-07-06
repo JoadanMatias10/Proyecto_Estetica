@@ -1,6 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
+import {
+  ArcElement,
+  BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Legend,
+  LinearScale,
+  Tooltip,
+} from "chart.js";
+import { Bar, Doughnut } from "react-chartjs-2";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import { endpoints, requestJson } from "../../api";
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
 
 const PERIODS = ["Semana", "Mes", "Ano"];
 
@@ -33,18 +45,6 @@ function formatCurrency(value) {
   }).format(Number(value || 0));
 }
 
-function formatCompactCurrency(value) {
-  const parsed = Number(value || 0);
-  if (!Number.isFinite(parsed)) return "$0";
-  if (Math.abs(parsed) < 1000) return formatCurrency(parsed);
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "MXN",
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(parsed);
-}
-
 function formatCompactNumber(value) {
   const parsed = Number(value || 0);
   if (!Number.isFinite(parsed)) return "0";
@@ -60,6 +60,17 @@ function formatPercent(value) {
 
 function clampPercent(value) {
   return Math.min(Math.max(Number(value || 0), 0), 100);
+}
+
+function createVerticalGradient(context, topColor, bottomColor) {
+  const chart = context.chart;
+  const { ctx, chartArea } = chart;
+  if (!chartArea) return bottomColor;
+
+  const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+  gradient.addColorStop(0, topColor);
+  gradient.addColorStop(1, bottomColor);
+  return gradient;
 }
 
 function getAdminToken() {
@@ -105,17 +116,107 @@ export default function InformesEstadisticos() {
     [stats.comparison]
   );
 
-  const comparisonMax = useMemo(() => {
-    const maxValue = comparisonSeries.reduce((acc, item) => {
-      const localMax = Math.max(item.servicios, item.productos);
-      return Math.max(acc, localMax);
-    }, 0);
-    return maxValue > 0 ? maxValue : 1;
-  }, [comparisonSeries]);
+  const hasComparisonData = useMemo(
+    () => comparisonSeries.some((item) => item.servicios > 0 || item.productos > 0),
+    [comparisonSeries]
+  );
 
-  const comparisonTicks = useMemo(
-    () => [1, 0.75, 0.5, 0.25, 0].map((ratio) => comparisonMax * ratio),
-    [comparisonMax]
+  const comparisonChartData = useMemo(
+    () => ({
+      labels: comparisonSeries.map((item) => item.label),
+      datasets: [
+        {
+          label: "Servicios",
+          data: comparisonSeries.map((item) => item.servicios),
+          backgroundColor: (context) => createVerticalGradient(context, "#a78bfa", "#7c3aed"),
+          borderColor: "#6d28d9",
+          borderWidth: 1,
+          borderRadius: 10,
+          borderSkipped: false,
+          maxBarThickness: 30,
+          categoryPercentage: 0.72,
+          barPercentage: 0.82,
+        },
+        {
+          label: "Productos",
+          data: comparisonSeries.map((item) => item.productos),
+          backgroundColor: (context) => createVerticalGradient(context, "#fda4af", "#f43f5e"),
+          borderColor: "#e11d48",
+          borderWidth: 1,
+          borderRadius: 10,
+          borderSkipped: false,
+          maxBarThickness: 30,
+          categoryPercentage: 0.72,
+          barPercentage: 0.82,
+        },
+      ],
+    }),
+    [comparisonSeries]
+  );
+
+  const comparisonChartOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: "index",
+        intersect: false,
+      },
+      scales: {
+        x: {
+          grid: {
+            display: false,
+          },
+          border: {
+            display: false,
+          },
+          ticks: {
+            color: "#64748b",
+            font: {
+              size: 11,
+              weight: 600,
+            },
+          },
+        },
+        y: {
+          beginAtZero: true,
+          border: {
+            display: false,
+          },
+          grid: {
+            color: "rgba(148, 163, 184, 0.22)",
+            drawTicks: false,
+          },
+          ticks: {
+            color: "#94a3b8",
+            padding: 10,
+            callback: (value) => formatCompactNumber(value),
+            font: {
+              size: 11,
+              weight: 600,
+            },
+          },
+        },
+      },
+      plugins: {
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          backgroundColor: "#0f172a",
+          titleColor: "#ffffff",
+          bodyColor: "#e2e8f0",
+          borderColor: "rgba(255, 255, 255, 0.14)",
+          borderWidth: 1,
+          padding: 12,
+          displayColors: true,
+          callbacks: {
+            label: (context) => `${context.dataset.label}: ${formatCurrency(context.parsed.y)}`,
+          },
+        },
+      },
+    }),
+    []
   );
 
   const distributionItems = useMemo(
@@ -138,31 +239,54 @@ export default function InformesEstadisticos() {
     return servicios + productos + otros;
   }, [stats.distribution]);
 
+  const hasDistributionData = distributionTotal > 0;
+
   const topDistribution = useMemo(
     () => distributionItems.reduce((best, item) => (item.value > best.value ? item : best), distributionItems[0] || { value: 0, label: "Sin datos" }),
     [distributionItems]
   );
 
-  const donutStyle = useMemo(() => {
-    const servicios = clampPercent(stats.distribution.servicios);
-    const productos = clampPercent(stats.distribution.productos);
-    const otros = clampPercent(stats.distribution.otros);
-    const p1 = servicios;
-    const p2 = Math.min(servicios + productos, 100);
-    const p3 = Math.min(servicios + productos + otros, 100);
+  const distributionChartData = useMemo(
+    () => ({
+      labels: distributionItems.map((item) => item.label),
+      datasets: [
+        {
+          data: distributionItems.map((item) => item.value),
+          backgroundColor: distributionItems.map((item) => item.solid),
+          borderColor: "#ffffff",
+          borderWidth: 6,
+          hoverOffset: 12,
+          spacing: 3,
+        },
+      ],
+    }),
+    [distributionItems]
+  );
 
-    if (p3 <= 0) {
-      return {
-        background: "conic-gradient(#e2e8f0 0% 100%)",
-      };
-    }
-
-    return {
-      background: `conic-gradient(#8b5cf6 0% ${p1}%, #fb7185 ${p1}% ${p2}%, #f59e0b ${p2}% ${p3}%)`,
-    };
-  }, [stats.distribution]);
-
-  const chartMinWidth = Math.max(comparisonSeries.length * 74, 520);
+  const distributionChartOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "72%",
+      plugins: {
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          backgroundColor: "#0f172a",
+          titleColor: "#ffffff",
+          bodyColor: "#e2e8f0",
+          borderColor: "rgba(255, 255, 255, 0.14)",
+          borderWidth: 1,
+          padding: 12,
+          callbacks: {
+            label: (context) => `${context.label}: ${formatPercent(context.raw)}`,
+          },
+        },
+      },
+    }),
+    []
+  );
 
   return (
     <div className="space-y-6">
@@ -239,64 +363,13 @@ export default function InformesEstadisticos() {
               </div>
 
               <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-                {comparisonSeries.length === 0 ? (
+                {comparisonSeries.length === 0 || !hasComparisonData ? (
                   <div className="h-64 flex items-center justify-center text-slate-400 text-sm">
                     Sin datos para graficar.
                   </div>
                 ) : (
-                  <div className="overflow-x-auto pb-2">
-                    <div className="grid gap-3" style={{ gridTemplateColumns: `44px minmax(${chartMinWidth}px, 1fr)` }}>
-                      <div className="flex h-64 flex-col justify-between pb-7 text-[11px] font-medium text-slate-400">
-                        {comparisonTicks.map((tick, index) => (
-                          <span key={`${tick}-${index}`}>{formatCompactNumber(tick)}</span>
-                        ))}
-                      </div>
-
-                      <div className="relative h-64 min-w-[520px]">
-                        <div className="absolute inset-0 flex flex-col justify-between">
-                          {comparisonTicks.map((tick, index) => (
-                            <div key={`${tick}-line-${index}`} className="border-t border-dashed border-slate-200" />
-                          ))}
-                        </div>
-
-                        <div className="relative z-10 h-full flex items-end gap-3">
-                          {comparisonSeries.map((item) => {
-                            const serviceHeight = item.servicios > 0 ? Math.max((item.servicios / comparisonMax) * 100, 12) : 0;
-                            const productHeight = item.productos > 0 ? Math.max((item.productos / comparisonMax) * 100, 12) : 0;
-
-                            return (
-                              <div key={item.label} className="w-full min-w-0 flex flex-col items-center gap-2">
-                                <div className="w-full h-full flex items-end justify-center">
-                                  <div className="w-full max-w-[58px] h-full flex items-end gap-1.5 rounded-t-xl px-1 pt-6 hover:bg-white/70 transition-colors">
-                                    <div className="w-1/2 h-full flex flex-col justify-end gap-2">
-                                      <span className="text-[10px] text-center font-semibold text-violet-700">
-                                        {item.servicios > 0 ? formatCompactCurrency(item.servicios) : ""}
-                                      </span>
-                                      <div
-                                        className="w-full rounded-t-xl bg-gradient-to-t from-violet-600 via-violet-500 to-violet-300 shadow-[0_12px_24px_rgba(139,92,246,0.24)] transition-all duration-700"
-                                        style={{ height: `${serviceHeight}%`, minHeight: item.servicios > 0 ? 22 : 0 }}
-                                        title={`Servicios ${item.label}: ${formatCurrency(item.servicios)}`}
-                                      />
-                                    </div>
-                                    <div className="w-1/2 h-full flex flex-col justify-end gap-2">
-                                      <span className="text-[10px] text-center font-semibold text-rose-600">
-                                        {item.productos > 0 ? formatCompactCurrency(item.productos) : ""}
-                                      </span>
-                                      <div
-                                        className="w-full rounded-t-xl bg-gradient-to-t from-rose-500 via-rose-400 to-rose-200 shadow-[0_12px_24px_rgba(251,113,133,0.24)] transition-all duration-700"
-                                        style={{ height: `${productHeight}%`, minHeight: item.productos > 0 ? 22 : 0 }}
-                                        title={`Productos ${item.label}: ${formatCurrency(item.productos)}`}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                                <span className="text-[11px] text-slate-500 font-semibold text-center">{item.label}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
+                  <div className="h-72 min-w-0">
+                    <Bar data={comparisonChartData} options={comparisonChartOptions} />
                   </div>
                 )}
               </div>
@@ -319,17 +392,20 @@ export default function InformesEstadisticos() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-center h-64 rounded-2xl border border-slate-100 bg-slate-50/70 relative overflow-hidden">
-                <div className="absolute h-40 w-40 rounded-full bg-violet-100/80 blur-3xl" />
-                <div className="absolute h-36 w-36 translate-x-10 translate-y-8 rounded-full bg-rose-100/80 blur-3xl" />
-                <div className="relative w-52 h-52 rounded-full p-4 shadow-[0_18px_44px_rgba(148,163,184,0.24)] ring-8 ring-white/90" style={donutStyle}>
-                  <div className="w-full h-full rounded-full bg-white flex items-center justify-center shadow-inner">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-slate-800">{distributionTotal.toFixed(1)}%</div>
-                      <div className="text-xs text-slate-400">Total</div>
+              <div className="flex items-center justify-center h-72 rounded-2xl border border-slate-100 bg-slate-50/70 relative overflow-hidden">
+                {hasDistributionData ? (
+                  <div className="relative h-56 w-56">
+                    <Doughnut data={distributionChartData} options={distributionChartOptions} />
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-slate-800">{distributionTotal.toFixed(1)}%</div>
+                        <div className="text-xs text-slate-400">Total</div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="text-slate-400 text-sm">Sin datos para graficar.</div>
+                )}
               </div>
 
               <div className="mt-4 space-y-3">

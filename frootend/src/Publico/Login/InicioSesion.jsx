@@ -43,7 +43,7 @@ export default function InicioSesion() {
           if (data.user?.role === "admin" || data.user?.role === "stylist") {
             localStorage.setItem("adminToken", data.token);
             localStorage.setItem("adminUser", JSON.stringify(data.user));
-            navigate("/admin");
+            navigate(data.user.role === "stylist" ? "/estilista" : "/admin");
           } else {
             navigate("/cliente");
           }

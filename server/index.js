@@ -5,7 +5,9 @@ const mongoose = require("mongoose");
 
 const publicRoutes = require("./routes/publico");
 const clientRoutes = require("./routes/cliente");
+const stylistRoutes = require("./routes/estilista");
 const adminRoutes = require("./routes/administrador");
+const alexaRoutes = require("./routes/alexa");
 const { ensureCatalogData } = require("./utils/sembrarDatosCatalogo");
 
 const app = express();
@@ -30,7 +32,9 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/public", publicRoutes);
 app.use("/api/client", clientRoutes);
+app.use("/api/stylist", stylistRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/alexa", alexaRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: "Ruta no encontrada." });

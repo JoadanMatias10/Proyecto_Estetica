@@ -37,6 +37,26 @@ export const endpoints = {
   publicHomeHighlights: buildUrl("/public/home-highlights"),
   publicCarousel: buildUrl("/public/carousel"),
 
+  clientMe: buildUrl("/client/me"),
+  clientProfile: (id) => buildUrl(`/client/profile/${encodeURIComponent(id || "")}`),
+  clientAppointments: buildUrl("/client/appointments"),
+  clientAppointmentReprogram: (id) => buildUrl(`/client/appointments/${encodeURIComponent(id || "")}/reprogram`),
+  clientAppointmentCancel: (id) => buildUrl(`/client/appointments/${encodeURIComponent(id || "")}/cancel`),
+  clientStylists: buildUrl("/client/stylists"),
+  clientStylistAvailability: (id, { desde = "", hasta = "", serviceId = "" } = {}) =>
+    buildUrl(`/client/stylists/${encodeURIComponent(id || "")}/availability?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&serviceId=${encodeURIComponent(serviceId)}`),
+  clientNotificationSettings: buildUrl("/client/notification-settings"),
+  clientReminderSettings: buildUrl("/client/reminder-settings"),
+  clientNotificationPreferences: buildUrl("/client/notification-preferences"),
+  clientNotifications: buildUrl("/client/notifications"),
+  clientNotificationPrepare: buildUrl("/client/notifications/prepare"),
+
+  stylistMe: buildUrl("/stylist/me"),
+  stylistAvailability: buildUrl("/stylist/availability"),
+  stylistAppointments: ({ desde = "", hasta = "", estado = "Todos" } = {}) =>
+    buildUrl(`/stylist/appointments?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&estado=${encodeURIComponent(estado)}`),
+  stylistAppointmentStatus: (id) => buildUrl(`/stylist/appointments/${encodeURIComponent(id || "")}/status`),
+
   adminProducts: buildUrl("/admin/products"),
   adminProductsExport: buildUrl("/admin/products/export"),
   adminProductsImport: buildUrl("/admin/products/import"),

@@ -22,6 +22,15 @@ const userSchema = new mongoose.Schema(
     inviteSentAt: { type: Date, default: null },
     passwordResetSentAt: { type: Date, default: null },
     activatedAt: { type: Date, default: null },
+    reminderSettings: {
+      anticipacion: { type: String, default: "24 horas antes" },
+      canal: { type: String, default: "Email" },
+    },
+    notificationPreferences: {
+      appointmentReminders: { type: Boolean, default: true },
+      promotions: { type: Boolean, default: true },
+      appointmentChanges: { type: Boolean, default: true },
+    },
   },
   { timestamps: true, collection: "usuarios" }
 );

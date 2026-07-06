@@ -32,7 +32,7 @@ function isInternalUserRole(role) {
 }
 
 function canUseAdminPanel(role) {
-  return isInternalUserRole(role);
+  return String(role || "").trim() === "admin";
 }
 
 function normalizeAppBaseUrl(value) {

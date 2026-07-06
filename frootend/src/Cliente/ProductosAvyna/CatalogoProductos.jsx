@@ -5,6 +5,7 @@ import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import SidebarIcon from "../../components/ui/SidebarIcon";
 import { fetchPublicProductsBundle } from "../../utils/publicCatalogApi";
 import { formatProductPresentation } from "../../utils/productPresentation";
+import { addProductToCart } from "../../utils/clientStore";
 
 export default function CatalogoProductos() {
   const [productos, setProductos] = useState([]);
@@ -14,7 +15,9 @@ export default function CatalogoProductos() {
   const [isLoading, setIsLoading] = useState(true);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [addedProductId, setAddedProductId] = useState("");
   const filterTimerRef = useRef(null);
+  const cartFeedbackTimerRef = useRef(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -37,6 +40,7 @@ export default function CatalogoProductos() {
   useEffect(() => {
     return () => {
       if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
+      if (cartFeedbackTimerRef.current) clearTimeout(cartFeedbackTimerRef.current);
     };
   }, []);
 
@@ -84,6 +88,16 @@ export default function CatalogoProductos() {
     showFilterLoading(() => {
       setSelectedCategory(null);
     });
+  };
+
+  const handleAddToCart = (product, presentation) => {
+    addProductToCart({ ...product, presentacion: presentation }, 1);
+    setAddedProductId(product.id);
+    if (cartFeedbackTimerRef.current) clearTimeout(cartFeedbackTimerRef.current);
+    cartFeedbackTimerRef.current = setTimeout(() => {
+      setAddedProductId("");
+      cartFeedbackTimerRef.current = null;
+    }, 1400);
   };
 
   return (
@@ -219,11 +233,13 @@ export default function CatalogoProductos() {
                             Detalle
                           </Button>
                         </Link>
-                        <Link to={`/cliente/productos/pago/${product.id}`} className="w-full">
-                          <Button className="w-full py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-violet-200 hover:shadow-lg hover:shadow-violet-300 transition-all transform hover:-translate-y-0.5">
-                            Comprar
-                          </Button>
-                        </Link>
+                        <Button
+                          type="button"
+                          onClick={() => handleAddToCart(product, presentation)}
+                          className="w-full py-2.5 rounded-xl text-sm font-semibold shadow-md shadow-violet-200 hover:shadow-lg hover:shadow-violet-300 transition-all transform hover:-translate-y-0.5"
+                        >
+                          {addedProductId === product.id ? "Agregado" : "Agregar"}
+                        </Button>
                       </div>
                     </div>
                   </div>

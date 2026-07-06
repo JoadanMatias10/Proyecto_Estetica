@@ -1,11 +1,21 @@
 import React from "react";
-import { Outlet } from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 import ClientHeader from "./ClientHeader";
 
 import ClientSidebar from "./ClientSidebar";
 import Breadcrumbs from "../ui/Breadcrumbs";
+import { getClientToken, getStoredClientUser } from "../../utils/clientStore";
 
 export default function ClientLayout() {
+  if (!getClientToken()) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const user = getStoredClientUser();
+  if (user?.role && user.role !== "client") {
+    return <Navigate to={user.role === "stylist" ? "/estilista" : "/admin"} replace />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-rose-100/30 to-rose-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 dark:text-white transition-colors duration-300">
       <ClientHeader />

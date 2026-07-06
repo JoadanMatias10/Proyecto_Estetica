@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import ErrorPage from "../../Publico/Error/ErrorPage";
 import { endpoints, requestJson } from "../../api";
 import { formatProductPresentation } from "../../utils/productPresentation";
+import { addProductToCart } from "../../utils/clientStore";
 
 export default function DetalleProductoCliente() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [cantidad, setCantidad] = useState(1);
   const [prod, setProd] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,6 +69,11 @@ export default function DetalleProductoCliente() {
   const handleCantidad = (val) => {
     if (val < 1) return;
     setCantidad(val);
+  };
+
+  const handleAddToCart = () => {
+    addProductToCart({ ...prod, presentacion: presentation }, cantidad);
+    navigate("/cliente/carrito");
   };
 
   return (
@@ -134,9 +141,17 @@ export default function DetalleProductoCliente() {
               >+</button>
             </div>
 
-            <Link to="/cliente/carrito" className="w-full sm:w-auto flex-1">
-              <button className="w-full h-14 bg-violet-600 hover:bg-violet-700 text-white font-bold uppercase tracking-wider text-sm rounded-xl shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all duration-300 transform hover:-translate-y-1 flex items-center justify-center gap-2">
-                <span>Anadir al carrito</span>
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              className="w-full sm:w-auto flex-1 h-14 bg-violet-600 hover:bg-violet-700 text-white font-bold uppercase tracking-wider text-sm rounded-xl shadow-lg shadow-violet-200 hover:shadow-violet-300 transition-all duration-300 transform hover:-translate-y-1 flex items-center justify-center gap-2"
+            >
+              <span>Anadir al carrito</span>
+            </button>
+
+            <Link to={`/cliente/productos/pago/${prod.id}`} className="w-full sm:w-auto flex-1">
+              <button className="w-full h-14 bg-rose-500 hover:bg-rose-600 text-white font-bold uppercase tracking-wider text-sm rounded-xl shadow-lg shadow-rose-200 hover:shadow-rose-300 transition-all duration-300 transform hover:-translate-y-1">
+                Comprar ahora
               </button>
             </Link>
           </div>

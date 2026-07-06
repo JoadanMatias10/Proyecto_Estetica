@@ -160,6 +160,16 @@ function registrarStaffAdminRoutes(router, contexto) {
     await linkedUser.save();
   }
 
+  function buildInviteFailureMessage(error) {
+    const message = String(error?.message || "");
+    const ipMatch = message.match(/IP address\s+([0-9.]+)/i);
+    if (/unrecognised IP address|authorised_ips|unauthorized|No autorizado/i.test(message)) {
+      const ipText = ipMatch?.[1] ? ` IP actual: ${ipMatch[1]}.` : "";
+      return `Brevo bloqueo el envio porque la IP del servidor no esta autorizada.${ipText} Agrega esa IP en Brevo > Seguridad > IPs autorizadas.`;
+    }
+    return "No fue posible enviar la invitacion.";
+  }
+
   router.get("/staff", async (_req, res) => {
     const staff = await listStaffWithAccounts();
     return res.json({ staff });
@@ -219,8 +229,8 @@ function registrarStaffAdminRoutes(router, contexto) {
       try {
         await sendInvite(linkedUser, req.admin?.id || null);
         message = "Personal creado e invitacion enviada.";
-      } catch (_error) {
-        warning = "Personal creado, pero no fue posible enviar la invitacion.";
+      } catch (error) {
+        warning = buildInviteFailureMessage(error);
       }
     }
 
@@ -311,8 +321,8 @@ function registrarStaffAdminRoutes(router, contexto) {
           message = result.created
             ? "Personal actualizado e invitacion enviada."
             : "Personal actualizado e invitacion reenviada.";
-        } catch (_error) {
-          warning = "Personal actualizado, pero no fue posible enviar la invitacion.";
+        } catch (error) {
+          warning = buildInviteFailureMessage(error);
         }
       }
     }
@@ -356,7 +366,7 @@ function registrarStaffAdminRoutes(router, contexto) {
     try {
       await sendInvite(result.linkedUser, req.admin?.id || null);
     } catch (error) {
-      return res.status(500).json({ errors: ["No fue posible enviar la invitacion."] });
+      return res.status(500).json({ errors: [buildInviteFailureMessage(error)] });
     }
 
     return res.json({

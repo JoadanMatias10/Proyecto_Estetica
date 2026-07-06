@@ -87,6 +87,15 @@ import NotificacionesCliente from "./Cliente/Perfil/NotificacionesCliente";
 
 
 
+// Estilista
+import EstilistaLayout from "./components/layout/EstilistaLayout";
+import DashboardEstilista from "./Estilista/DashboardEstilista";
+import CitasAsignadas from "./Estilista/CitasAsignadas";
+import ServiciosRealizados from "./Estilista/ServiciosRealizados";
+import AgendaCalendario from "./Estilista/AgendaCalendario";
+import HorarioTrabajo from "./Estilista/HorarioTrabajo";
+import NotificacionesEstilista from "./Estilista/NotificacionesEstilista";
+
 // Admin
 import AdminLayout from "./components/layout/AdminLayout";
 import DashboardAdmin from "./Administrador/DashboardAdmin";
@@ -146,10 +155,11 @@ export default function App() {
         <Route index element={<DashboardCliente />} />
 
         <Route path="productos" element={<CatalogoProductos />} />
-        <Route path="productos/:id" element={<DetalleProductoCliente />} />
         <Route path="productos/pago/:id" element={<PagoProducto />} />
+        <Route path="productos/:id" element={<DetalleProductoCliente />} />
 
         <Route path="carrito" element={<CarritoCompra />} />
+        <Route path="carrito/pago" element={<PagoProducto mode="cart" />} />
         <Route path="carrito/estado" element={<EstadoCarrito />} />
 
         <Route path="citas" element={<AgendarCancelarCitas />} />
@@ -157,8 +167,8 @@ export default function App() {
         <Route path="citas/calendario" element={<CalendarioDisponibilidad />} />
 
         <Route path="servicios" element={<ConsultaServicioCliente />} />
-        <Route path="servicios/:id" element={<DetalleServicioCliente />} />
         <Route path="servicios/pago" element={<PagoServicios />} />
+        <Route path="servicios/:id" element={<DetalleServicioCliente />} />
 
         <Route path="notificaciones" element={<RecordarCita />} />
         <Route path="notificaciones/enviar" element={<NotificarCitas />} />
@@ -168,6 +178,15 @@ export default function App() {
         <Route path="perfil" element={<PerfilCliente />} />
         <Route path="perfil/info" element={<InformacionCliente />} />
         <Route path="perfil/notificaciones" element={<NotificacionesCliente />} />
+      </Route>
+
+      <Route path="/estilista" element={<EstilistaLayout />}>
+        <Route index element={<DashboardEstilista />} />
+        <Route path="citas" element={<CitasAsignadas />} />
+        <Route path="servicios" element={<ServiciosRealizados />} />
+        <Route path="agenda" element={<AgendaCalendario />} />
+        <Route path="horario" element={<HorarioTrabajo />} />
+        <Route path="notificaciones" element={<NotificacionesEstilista />} />
       </Route>
 
       <Route path="/admin" element={<AdminLayout />}>
