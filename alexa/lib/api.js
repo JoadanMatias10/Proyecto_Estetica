@@ -150,6 +150,32 @@ async function verifyAlexaLogin(challengeId, code) {
     });
 }
 
+async function startStylistAlexaLogin(identifier) {
+    return requestJson('/alexa/stylist/auth/start', {
+        method: 'POST',
+        body: { identifier }
+    });
+}
+
+async function verifyStylistAlexaLogin(challengeId, code) {
+    return requestJson('/alexa/stylist/auth/verify', {
+        method: 'POST',
+        body: { challengeId, code }
+    });
+}
+
+async function getStylistDashboardProfile(token) {
+    return requestJson('/alexa/stylist/me', { token });
+}
+
+async function getStylistAppointments(token, { desde = '', hasta = desde, estado = '' } = {}) {
+    const data = await requestJson('/alexa/stylist/appointments', {
+        token,
+        query: { desde, hasta, estado }
+    });
+    return Array.isArray(data.appointments) ? data.appointments : [];
+}
+
 module.exports = {
     getApiBaseUrl,
     hasApiConfig,
@@ -159,5 +185,9 @@ module.exports = {
     getStylistAvailability,
     createClientAppointment,
     startAlexaLogin,
-    verifyAlexaLogin
+    verifyAlexaLogin,
+    startStylistAlexaLogin,
+    verifyStylistAlexaLogin,
+    getStylistDashboardProfile,
+    getStylistAppointments
 };

@@ -1,0 +1,461 @@
+{
+  "type": "APL",
+  "version": "1.7",
+  "theme": "dark",
+  "mainTemplate": {
+    "parameters": [
+      "payload"
+    ],
+    "items": [
+      {
+        "type": "Container",
+        "width": "100vw",
+        "height": "100vh",
+        "backgroundColor": "#070507",
+        "paddingLeft": "${viewport.width < 700 ? '4vw' : '5vw'}",
+        "paddingRight": "${viewport.width < 700 ? '4vw' : '5vw'}",
+        "paddingTop": "3vh",
+        "paddingBottom": "3vh",
+        "items": [
+          {
+            "type": "Frame",
+            "position": "absolute",
+            "right": "-14vw",
+            "top": "-20vh",
+            "width": "42vw",
+            "height": "42vw",
+            "borderRadius": 1000,
+            "backgroundColor": "#5B1E3E",
+            "opacity": 0.28
+          },
+          {
+            "type": "Frame",
+            "position": "absolute",
+            "left": "-18vw",
+            "bottom": "-26vh",
+            "width": "48vw",
+            "height": "48vw",
+            "borderRadius": 1000,
+            "backgroundColor": "#7A4A1D",
+            "opacity": 0.18
+          },
+          {
+            "type": "Container",
+            "height": "9vh",
+            "direction": "row",
+            "alignItems": "center",
+            "justifyContent": "spaceBetween",
+            "items": [
+              {
+                "type": "TouchWrapper",
+                "width": 62,
+                "height": 52,
+                "onPress": [
+                  {
+                    "type": "SendEvent",
+                    "arguments": [
+                      "home"
+                    ]
+                  }
+                ],
+                "item": {
+                  "type": "Frame",
+                  "width": "100%",
+                  "height": "100%",
+                  "backgroundColor": "#2A1725",
+                  "borderColor": "#76415F",
+                  "borderWidth": 1,
+                  "borderRadius": 18,
+                  "item": {
+                    "type": "Text",
+                    "text": "‹",
+                    "textAlign": "center",
+                    "textAlignVertical": "center",
+                    "color": "#FFFFFF",
+                    "fontSize": 38,
+                    "fontWeight": "700"
+                  }
+                }
+              },
+              {
+                "type": "Text",
+                "text": "${payload.screenData.properties.brand}",
+                "color": "#F0A6B8",
+                "fontSize": "2vh",
+                "fontWeight": "700",
+                "letterSpacing": 2,
+                "maxLines": 1
+              },
+              {
+                "type": "TouchWrapper",
+                "width": 126,
+                "height": 52,
+                "onPress": [
+                  {
+                    "type": "SendEvent",
+                    "arguments": [
+                      "stylistLogout"
+                    ]
+                  }
+                ],
+                "item": {
+                  "type": "Frame",
+                  "width": "100%",
+                  "height": "100%",
+                  "backgroundColor": "#2A1725",
+                  "borderColor": "#76415F",
+                  "borderWidth": 1,
+                  "borderRadius": 18,
+                  "item": {
+                    "type": "Text",
+                    "text": "Cerrar sesión",
+                    "textAlign": "center",
+                    "textAlignVertical": "center",
+                    "color": "#FFFFFF",
+                    "fontSize": "1.75vh",
+                    "fontWeight": "700",
+                    "maxLines": 1
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "Container",
+            "height": "${viewport.width < 700 ? '20vh' : '18vh'}",
+            "direction": "${viewport.width < 700 ? 'column' : 'row'}",
+            "justifyContent": "spaceBetween",
+            "spacing": "1.5vh",
+            "items": [
+              {
+                "type": "Container",
+                "grow": 1,
+                "justifyContent": "center",
+                "items": [
+                  {
+                    "type": "Text",
+                    "text": "${payload.screenData.properties.title}",
+                    "color": "#FFFFFF",
+                    "fontSize": "${viewport.width < 700 ? '4.5vh' : '5.8vh'}",
+                    "fontWeight": "700",
+                    "maxLines": 1
+                  },
+                  {
+                    "type": "Text",
+                    "text": "${payload.screenData.properties.subtitle}",
+                    "color": "#E8DCE1",
+                    "fontSize": "2.15vh",
+                    "spacing": 6,
+                    "maxLines": 2
+                  }
+                ]
+              },
+              {
+                "type": "Container",
+                "width": "${viewport.width < 700 ? '100%' : '36vw'}",
+                "direction": "row",
+                "spacing": "1vw",
+                "alignItems": "center",
+                "items": [
+                  {
+                    "type": "TouchWrapper",
+                    "grow": 1,
+                    "height": 58,
+                    "onPress": [
+                      {
+                        "type": "SendEvent",
+                        "arguments": [
+                          "stylistAppointments",
+                          "today"
+                        ]
+                      }
+                    ],
+                    "item": {
+                      "type": "Frame",
+                      "width": "100%",
+                      "height": "100%",
+                      "backgroundColor": "#F0A6B8",
+                      "borderRadius": 18,
+                      "item": {
+                        "type": "Text",
+                        "text": "Hoy",
+                        "textAlign": "center",
+                        "textAlignVertical": "center",
+                        "color": "#24101A",
+                        "fontSize": "2.2vh",
+                        "fontWeight": "700"
+                      }
+                    }
+                  },
+                  {
+                    "type": "TouchWrapper",
+                    "grow": 1,
+                    "height": 58,
+                    "onPress": [
+                      {
+                        "type": "SendEvent",
+                        "arguments": [
+                          "stylistAppointments",
+                          "tomorrow"
+                        ]
+                      }
+                    ],
+                    "item": {
+                      "type": "Frame",
+                      "width": "100%",
+                      "height": "100%",
+                      "backgroundColor": "#2A1725",
+                      "borderColor": "#76415F",
+                      "borderWidth": 1,
+                      "borderRadius": 18,
+                      "item": {
+                        "type": "Text",
+                        "text": "Mañana",
+                        "textAlign": "center",
+                        "textAlignVertical": "center",
+                        "color": "#FFFFFF",
+                        "fontSize": "2.2vh",
+                        "fontWeight": "700"
+                      }
+                    }
+                  },
+                  {
+                    "type": "TouchWrapper",
+                    "grow": 1,
+                    "height": 58,
+                    "onPress": [
+                      {
+                        "type": "SendEvent",
+                        "arguments": [
+                          "home"
+                        ]
+                      }
+                    ],
+                    "item": {
+                      "type": "Frame",
+                      "width": "100%",
+                      "height": "100%",
+                      "backgroundColor": "#21131D",
+                      "borderColor": "#4C2A41",
+                      "borderWidth": 1,
+                      "borderRadius": 18,
+                      "item": {
+                        "type": "Text",
+                        "text": "Inicio",
+                        "textAlign": "center",
+                        "textAlignVertical": "center",
+                        "color": "#FFFFFF",
+                        "fontSize": "2.2vh",
+                        "fontWeight": "700"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "Container",
+            "height": "14vh",
+            "direction": "row",
+            "spacing": "1.6vw",
+            "items": [
+              {
+                "type": "Frame",
+                "grow": 1,
+                "height": "100%",
+                "backgroundColor": "#51243E",
+                "borderColor": "#F0A6B8",
+                "borderWidth": 1,
+                "borderRadius": 24,
+                "paddingLeft": 22,
+                "paddingRight": 22,
+                "item": {
+                  "type": "Container",
+                  "height": "100%",
+                  "justifyContent": "center",
+                  "items": [
+                    {
+                      "type": "Text",
+                      "text": "${payload.screenData.properties.dateLabel}",
+                      "color": "#FFFFFF",
+                      "fontSize": "3.2vh",
+                      "fontWeight": "700",
+                      "maxLines": 1
+                    },
+                    {
+                      "type": "Text",
+                      "text": "${payload.screenData.properties.dateHint}",
+                      "color": "#E8DCE1",
+                      "fontSize": "1.95vh",
+                      "spacing": 5,
+                      "maxLines": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "Frame",
+                "width": "${viewport.width < 700 ? '30vw' : '18vw'}",
+                "height": "100%",
+                "backgroundColor": "#151E1B",
+                "borderColor": "#93E0CE",
+                "borderWidth": 1,
+                "borderRadius": 24,
+                "item": {
+                  "type": "Container",
+                  "height": "100%",
+                  "alignItems": "center",
+                  "justifyContent": "center",
+                  "items": [
+                    {
+                      "type": "Text",
+                      "text": "${payload.screenData.properties.total}",
+                      "color": "#93E0CE",
+                      "fontSize": "5vh",
+                      "fontWeight": "700",
+                      "maxLines": 1
+                    },
+                    {
+                      "type": "Text",
+                      "text": "${payload.screenData.properties.totalLabel}",
+                      "color": "#FFFFFF",
+                      "fontSize": "1.85vh",
+                      "fontWeight": "700",
+                      "maxLines": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "type": "Frame",
+            "height": "52vh",
+            "width": "100%",
+            "backgroundColor": "#21131D",
+            "borderColor": "#4C2A41",
+            "borderWidth": 1,
+            "borderRadius": 26,
+            "paddingLeft": "${viewport.width < 700 ? 14 : 20}",
+            "paddingRight": "${viewport.width < 700 ? 14 : 20}",
+            "paddingTop": 16,
+            "paddingBottom": 16,
+            "spacing": "1.5vh",
+            "item": {
+              "type": "Container",
+              "height": "100%",
+              "items": [
+                {
+                  "type": "Text",
+                  "when": "${!payload.screenData.properties.hasAppointments}",
+                  "text": "${payload.screenData.properties.emptyMessage}",
+                  "color": "#E8DCE1",
+                  "fontSize": "2.6vh",
+                  "fontWeight": "700",
+                  "textAlign": "center",
+                  "textAlignVertical": "center",
+                  "width": "100%",
+                  "height": "100%"
+                },
+                {
+                  "type": "Sequence",
+                  "when": "${payload.screenData.properties.hasAppointments}",
+                  "width": "100%",
+                  "height": "100%",
+                  "spacing": 12,
+                  "data": "${payload.screenData.properties.appointments}",
+                  "item": {
+                    "type": "Frame",
+                    "width": "100%",
+                    "minHeight": "${viewport.width < 700 ? 128 : 118}",
+                    "backgroundColor": "#120A10",
+                    "borderColor": "${data.accent}",
+                    "borderWidth": 1,
+                    "borderRadius": 22,
+                    "paddingLeft": 18,
+                    "paddingRight": 18,
+                    "paddingTop": 14,
+                    "paddingBottom": 14,
+                    "item": {
+                      "type": "Container",
+                      "direction": "${viewport.width < 700 ? 'column' : 'row'}",
+                      "spacing": "${viewport.width < 700 ? '0.7vh' : '1.6vw'}",
+                      "alignItems": "${viewport.width < 700 ? 'start' : 'center'}",
+                      "items": [
+                        {
+                          "type": "Text",
+                          "text": "${data.horaLabel}",
+                          "color": "#F0A6B8",
+                          "fontSize": "3.4vh",
+                          "fontWeight": "700",
+                          "width": "${viewport.width < 700 ? '100%' : '12vw'}",
+                          "maxLines": 1
+                        },
+                        {
+                          "type": "Container",
+                          "grow": 1,
+                          "items": [
+                            {
+                              "type": "Text",
+                              "text": "${data.servicio}",
+                              "color": "#FFFFFF",
+                              "fontSize": "2.55vh",
+                              "fontWeight": "700",
+                              "maxLines": 1
+                            },
+                            {
+                              "type": "Text",
+                              "text": "${data.cliente}",
+                              "color": "#E8DCE1",
+                              "fontSize": "2.1vh",
+                              "spacing": 4,
+                              "maxLines": 1
+                            },
+                            {
+                              "type": "Text",
+                              "text": "${data.contacto}",
+                              "color": "#BFAEB6",
+                              "fontSize": "1.85vh",
+                              "spacing": 4,
+                              "maxLines": 1
+                            }
+                          ]
+                        },
+                        {
+                          "type": "Frame",
+                          "width": "${viewport.width < 700 ? '100%' : '13vw'}",
+                          "height": 44,
+                          "backgroundColor": "${data.accentSoft}",
+                          "borderRadius": 14,
+                          "item": {
+                            "type": "Text",
+                            "text": "${data.estadoLabel}",
+                            "textAlign": "center",
+                            "textAlignVertical": "center",
+                            "color": "#FFFFFF",
+                            "fontSize": "1.85vh",
+                            "fontWeight": "700",
+                            "maxLines": 1
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "Text",
+            "text": "${payload.screenData.properties.footerHint}",
+            "color": "#BFAEB6",
+            "fontSize": "1.8vh",
+            "spacing": "1vh",
+            "maxLines": 1
+          }
+        ]
+      }
+    ]
+  }
+}

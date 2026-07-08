@@ -1,0 +1,1615 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "estetica panamericana",
+      "intents": [
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": [
+            "cancelar",
+            "cancela",
+            "ya no quiero",
+            "detener"
+          ]
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": [
+            "ayuda",
+            "necesito ayuda",
+            "qué puedo hacer",
+            "qué puedo preguntar",
+            "cómo funciona"
+          ]
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": [
+            "salir",
+            "terminar",
+            "finalizar",
+            "adiós",
+            "hasta luego"
+          ]
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "ConsultarServiciosIntent",
+          "slots": [
+            {
+              "name": "servicio",
+              "type": "servicio"
+            },
+            {
+              "name": "tipoServicio",
+              "type": "tiposervicio"
+            }
+          ],
+          "samples": [
+            "qué servicios tienen",
+            "qué servicios ofrece la estética",
+            "muéstrame los servicios",
+            "dime los servicios disponibles",
+            "tienen {servicio}",
+            "tienen {servicio} {tipoServicio}",
+            "qué servicios hay para {tipoServicio}",
+            "cuánto dura {servicio}",
+            "qué incluye {servicio}",
+            "quiero información de {servicio}",
+            "háblame de {servicio}"
+          ]
+        },
+        {
+          "name": "ConsultarHorariosIntent",
+          "slots": [],
+          "samples": [
+            "cuál es su horario",
+            "a qué hora abren",
+            "a qué hora cierran",
+            "qué días trabajan",
+            "dime el horario de atención",
+            "están abiertos hoy",
+            "trabajan los sábados",
+            "muéstrame los horarios"
+          ]
+        },
+        {
+          "name": "ConsultarPreciosIntent",
+          "slots": [
+            {
+              "name": "servicio",
+              "type": "servicio"
+            },
+            {
+              "name": "producto",
+              "type": "producto"
+            }
+          ],
+          "samples": [
+            "quiero consultar un precio",
+            "muéstrame los precios",
+            "cuánto cuesta {producto}",
+            "cuál es el precio de {producto}",
+            "dime el precio de {producto}",
+            "qué precio tiene {producto}",
+            "cuánto cuesta el {producto}",
+            "dame el precio de {producto}",
+            "cuánto vale {producto}",
+            "cuánto cuesta {servicio}",
+            "cuál es el precio de {servicio}",
+            "dime el precio de {servicio}",
+            "qué precio tiene {servicio}",
+            "cuánto cuesta el {servicio}",
+            "dame el precio de {servicio}",
+            "cuánto vale {servicio}",
+            "cuánto cuesta un corte para hombre",
+            "cuánto cuesta un corte para niño",
+            "cuánto cuesta un tinte",
+            "cuánto cuesta el shampoo revitalit",
+            "dame el precio del shampoo revitalit",
+            "cuánto cuesta el acondicionador revitalit",
+            "cuánto cuesta el tratamiento capilar"
+          ]
+        },
+        {
+          "name": "AgendarCitaIntent",
+          "slots": [
+            {
+              "name": "servicio",
+              "type": "servicio"
+            },
+            {
+              "name": "tipoServicio",
+              "type": "tiposervicio"
+            },
+            {
+              "name": "dia",
+              "type": "AMAZON.DATE"
+            },
+            {
+              "name": "hora",
+              "type": "AMAZON.TIME"
+            },
+            {
+              "name": "estilista",
+              "type": "estilista"
+            },
+            {
+              "name": "clienteRegistrado",
+              "type": "clienteRegistrado"
+            }
+          ],
+          "samples": [
+            "quiero agendar una cita",
+            "quiero reservar una cita",
+            "necesito una cita",
+            "quiero una cita para {servicio}",
+            "quiero una cita para {servicio} {tipoServicio}",
+            "agenda una cita para {servicio}",
+            "agenda una cita para {servicio} el {dia}",
+            "agenda una cita para {servicio} el {dia} a las {hora}",
+            "quiero una cita para {servicio} el {dia} a las {hora}",
+            "quiero una cita para {servicio} con {estilista}",
+            "quiero una cita para {servicio} el {dia} a las {hora} con {estilista}",
+            "quiero agendar con {estilista}",
+            "quiero agendar una cita con un estilista disponible",
+            "reserva {servicio} para el {dia}",
+            "reserva {servicio} a las {hora}",
+            "{dia}",
+            "el {dia}",
+            "para el {dia}",
+            "{dia} a las {hora}",
+            "el {dia} a las {hora}",
+            "{hora}",
+            "a las {hora}",
+            "a la {hora}",
+            "con {estilista}",
+            "{estilista}",
+            "quiero con {estilista}",
+            "{clienteRegistrado}",
+            "soy {clienteRegistrado}",
+            "cliente {clienteRegistrado}",
+            "ya soy {clienteRegistrado}"
+          ]
+        },
+        {
+          "name": "ConsultarProductosIntent",
+          "slots": [
+            {
+              "name": "producto",
+              "type": "producto"
+            }
+          ],
+          "samples": [
+            "qué productos venden",
+            "qué productos tienen",
+            "muéstrame los productos",
+            "tienen {producto}",
+            "venden {producto}",
+            "qué productos para el cabello tienen",
+            "qué descripción tiene {producto}",
+            "para qué sirve {producto}",
+            "dime la descripción de {producto}",
+            "tienen productos AVYNA",
+            "qué productos AVYNA venden",
+            "quiero información de {producto}"
+          ]
+        },
+        {
+          "name": "IdentificarClienteIntent",
+          "slots": [
+            {
+              "name": "identificadorCliente",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "mi telefono es {identificadorCliente}",
+            "mi número es {identificadorCliente}",
+            "mi numero es {identificadorCliente}",
+            "mi celular es {identificadorCliente}",
+            "mi correo es {identificadorCliente}",
+            "mi teléfono es {identificadorCliente}",
+            "teléfono {identificadorCliente}",
+            "telefono {identificadorCliente}",
+            "número {identificadorCliente}",
+            "numero {identificadorCliente}",
+            "celular {identificadorCliente}",
+            "correo {identificadorCliente}",
+            "soy {identificadorCliente}",
+            "mi teléfono registrado es {identificadorCliente}",
+            "el teléfono es {identificadorCliente}",
+            "el telefono es {identificadorCliente}",
+            "mi dato es {identificadorCliente}",
+            "te doy mi teléfono {identificadorCliente}",
+            "te doy mi telefono {identificadorCliente}"
+          ]
+        },
+        {
+          "name": "VerificarCodigoAlexaIntent",
+          "slots": [
+            {
+              "name": "codigoVerificacion",
+              "type": "AMAZON.NUMBER"
+            }
+          ],
+          "samples": [
+            "mi codigo es {codigoVerificacion}",
+            "el codigo es {codigoVerificacion}",
+            "código {codigoVerificacion}",
+            "codigo {codigoVerificacion}",
+            "es {codigoVerificacion}",
+            "{codigoVerificacion}",
+            "mi código es {codigoVerificacion}",
+            "el código es {codigoVerificacion}"
+          ]
+        },
+        {
+          "name": "EstilistaDashboardIntent",
+          "samples": [
+            "panel de estilista",
+            "soy estilista",
+            "entrar como estilista",
+            "abrir panel de estilista",
+            "mis citas de estilista",
+            "quiero ver mi panel de estilista"
+          ]
+        },
+        {
+          "name": "ConsultarCitasEstilistaIntent",
+          "slots": [
+            {
+              "name": "dia",
+              "type": "AMAZON.DATE"
+            },
+            {
+              "name": "hora",
+              "type": "AMAZON.TIME"
+            }
+          ],
+          "samples": [
+            "qué citas tengo hoy",
+            "que citas tengo hoy",
+            "para hoy qué citas tengo",
+            "para hoy que citas tengo",
+            "qué citas tengo para {dia}",
+            "que citas tengo para {dia}",
+            "mis citas de {dia}",
+            "mis citas para {dia}",
+            "agenda de hoy",
+            "muéstrame mis citas",
+            "muestrame mis citas",
+            "qué cita tengo a las {hora}",
+            "que cita tengo a las {hora}",
+            "qué citas tengo a las {hora}",
+            "que citas tengo a las {hora}",
+            "mis citas para {dia} a las {hora}"
+          ]
+        },
+        {
+          "name": "IdentificarEstilistaIntent",
+          "slots": [
+            {
+              "name": "identificadorEstilista",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "mi correo de estilista es {identificadorEstilista}",
+            "mi teléfono de estilista es {identificadorEstilista}",
+            "mi telefono de estilista es {identificadorEstilista}",
+            "soy estilista {identificadorEstilista}",
+            "estilista con correo {identificadorEstilista}",
+            "estilista con teléfono {identificadorEstilista}",
+            "estilista con telefono {identificadorEstilista}"
+          ]
+        }
+      ],
+      "types": [
+        {
+          "name": "servicio",
+          "values": [
+            {
+              "name": {
+                "value": "Alaciado Permanente",
+                "synonyms": [
+                  "Alaciado Permanente para Dama",
+                  "Dama Alaciado Permanente",
+                  "Tratamientos Alaciado Permanente"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Aplicación de Tinte",
+                "synonyms": [
+                  "Aplicación de Tinte para Dama",
+                  "Dama Aplicación de Tinte",
+                  "Color Aplicación de Tinte"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Base",
+                "synonyms": [
+                  "Base para Dama",
+                  "Dama Base",
+                  "Color Base"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Bob",
+                "synonyms": [
+                  "Corte Bob para Dama",
+                  "Dama Corte Bob",
+                  "Cortes Corte Bob"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Buzz Cut",
+                "synonyms": [
+                  "Corte Buzz Cut para Caballero",
+                  "Caballero Corte Buzz Cut",
+                  "Cortes Corte Buzz Cut"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Clásico",
+                "synonyms": [
+                  "Corte Clásico para Niño",
+                  "Niño Corte Clásico",
+                  "Cortes Corte Clásico"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte con Diseño",
+                "synonyms": [
+                  "Corte con Diseño para Caballero",
+                  "Caballero Corte con Diseño",
+                  "Cortes Corte con Diseño"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte con Diseño (líneas)",
+                "synonyms": [
+                  "Corte con Diseño (líneas) para Niño",
+                  "Niño Corte con Diseño (líneas)",
+                  "Cortes Corte con Diseño (líneas)"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Crew Cut",
+                "synonyms": [
+                  "Corte Crew Cut para Caballero",
+                  "Caballero Corte Crew Cut",
+                  "Cortes Corte Crew Cut"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Degradado Bajo",
+                "synonyms": [
+                  "Corte Degradado Bajo para Niño",
+                  "Niño Corte Degradado Bajo",
+                  "Cortes Corte Degradado Bajo"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Degradado Medio",
+                "synonyms": [
+                  "Corte Degradado Medio para Niño",
+                  "Niño Corte Degradado Medio",
+                  "Cortes Corte Degradado Medio"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte en Capas",
+                "synonyms": [
+                  "Corte en Capas para Dama",
+                  "Dama Corte en Capas",
+                  "Cortes Corte en Capas"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Escolar",
+                "synonyms": [
+                  "Corte Escolar para Niño",
+                  "Niño Corte Escolar",
+                  "Cortes Corte Escolar"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Fade Alto",
+                "synonyms": [
+                  "Corte Fade Alto para Caballero",
+                  "Caballero Corte Fade Alto",
+                  "Cortes Corte Fade Alto"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Fade Bajo",
+                "synonyms": [
+                  "Corte Fade Bajo para Caballero",
+                  "Caballero Corte Fade Bajo",
+                  "Cortes Corte Fade Bajo"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Fade Medio",
+                "synonyms": [
+                  "Corte Fade Medio para Caballero",
+                  "Caballero Corte Fade Medio",
+                  "Cortes Corte Fade Medio"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte French Crop",
+                "synonyms": [
+                  "Corte French Crop para Caballero",
+                  "Caballero Corte French Crop",
+                  "Cortes Corte French Crop"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Long Bob",
+                "synonyms": [
+                  "Corte Long Bob para Dama",
+                  "Dama Corte Long Bob",
+                  "Cortes Corte Long Bob"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Mariposa",
+                "synonyms": [
+                  "Corte Mariposa para Dama",
+                  "Dama Corte Mariposa",
+                  "Cortes Corte Mariposa"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Militar",
+                "synonyms": [
+                  "Corte Militar para Niño",
+                  "Niño Corte Militar",
+                  "Cortes Corte Militar"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Pixie",
+                "synonyms": [
+                  "Corte Pixie para Dama",
+                  "Dama Corte Pixie",
+                  "Cortes Corte Pixie"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Pompadour",
+                "synonyms": [
+                  "Corte Pompadour para Caballero",
+                  "Caballero Corte Pompadour",
+                  "Cortes Corte Pompadour"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Skin Fade",
+                "synonyms": [
+                  "Corte Skin Fade para Caballero",
+                  "Caballero Corte Skin Fade",
+                  "Cortes Corte Skin Fade"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Taper Fade",
+                "synonyms": [
+                  "Corte Taper Fade para Niño",
+                  "Niño Corte Taper Fade",
+                  "Cortes Corte Taper Fade"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Tipo Spiky",
+                "synonyms": [
+                  "Corte Tipo Spiky para Niño",
+                  "Niño Corte Tipo Spiky",
+                  "Cortes Corte Tipo Spiky"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Corte Undercut",
+                "synonyms": [
+                  "Corte Undercut para Caballero",
+                  "Caballero Corte Undercut",
+                  "Cortes Corte Undercut"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Depilacion",
+                "synonyms": [
+                  "Depilacion para Dama",
+                  "Dama Depilacion",
+                  "Estética Depilacion"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Diseño de Ceja",
+                "synonyms": [
+                  "Diseño de Ceja para Dama",
+                  "Dama Diseño de Ceja",
+                  "Estética Diseño de Ceja"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Fleco",
+                "synonyms": [
+                  "Fleco para Dama",
+                  "Dama Fleco",
+                  "Cortes Fleco"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Gelish",
+                "synonyms": [
+                  "Gelish para Dama",
+                  "Dama Gelish",
+                  "Uñas Gelish"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Lifting de Pestañas",
+                "synonyms": [
+                  "Lifting de Pestañas para Dama",
+                  "Dama Lifting de Pestañas",
+                  "Estética Lifting de Pestañas"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Manicure",
+                "synonyms": [
+                  "Manicure para Dama",
+                  "Dama Manicure",
+                  "Uñas Manicure"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Pedicure",
+                "synonyms": [
+                  "Pedicure para Dama",
+                  "Dama Pedicure",
+                  "Uñas Pedicure"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Permanente",
+                "synonyms": [
+                  "Permanente para Dama",
+                  "Dama Permanente",
+                  "Tratamientos Permanente"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Planchado",
+                "synonyms": [
+                  "Planchado para Dama",
+                  "Dama Planchado",
+                  "Tratamientos Planchado"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Planchado de Ceja",
+                "synonyms": [
+                  "Planchado de Ceja para Dama",
+                  "Dama Planchado de Ceja",
+                  "Estética Planchado de Ceja"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Rizado",
+                "synonyms": [
+                  "Rizado para Dama",
+                  "Dama Rizado",
+                  "Tratamientos Rizado"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "tiposervicio",
+          "values": [
+            {
+              "name": {
+                "value": "hombre",
+                "synonyms": [
+                  "caballero",
+                  "masculino",
+                  "varón",
+                  "para hombre"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "mujer",
+                "synonyms": [
+                  "dama",
+                  "femenino",
+                  "señora",
+                  "para mujer"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "niño",
+                "synonyms": [
+                  "infantil",
+                  "pequeño",
+                  "menor",
+                  "para niño"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "básico",
+                "synonyms": [
+                  "basico",
+                  "sencillo",
+                  "simple",
+                  "normal",
+                  "clásico"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "completo",
+                "synonyms": [
+                  "servicio completo",
+                  "paquete completo",
+                  "todo incluido"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "acrílicas",
+                "synonyms": [
+                  "acrilicas",
+                  "uñas acrílicas",
+                  "acrilico",
+                  "acrílico"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "gel",
+                "synonyms": [
+                  "uñas de gel",
+                  "gelish",
+                  "esmalte en gel"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "producto",
+          "values": [
+            {
+              "name": {
+                "value": "Bifasico Di Agave",
+                "synonyms": [
+                  "Avyna Bifasico Di Agave",
+                  "Bifasico Di Agave Avyna",
+                  "Bifasico Di Agave 200 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "BIFASICO DI ARGAN",
+                "synonyms": [
+                  "Avyna BIFASICO DI ARGAN",
+                  "BIFASICO DI ARGAN Avyna",
+                  "BIFASICO DI ARGAN 200 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Bifasico di Goji",
+                "synonyms": [
+                  "Avyna Bifasico di Goji",
+                  "Bifasico di Goji Avyna",
+                  "Bifasico di Goji 200 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Bifasico Ialuronico",
+                "synonyms": [
+                  "Avyna Bifasico Ialuronico",
+                  "Bifasico Ialuronico Avyna",
+                  "Bifasico Ialuronico 200 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Bifasico Platino",
+                "synonyms": [
+                  "Avyna Bifasico Platino",
+                  "Bifasico Platino Avyna",
+                  "Bifasico Platino 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Brochas Avyna – Angled shadow brush",
+                "synonyms": [
+                  "Avyna Brochas Avyna – Angled shadow brush",
+                  "Brochas Avyna – Angled shadow brush Avyna"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Brochas Avyna – Blending brush",
+                "synonyms": [
+                  "Avyna Brochas Avyna – Blending brush",
+                  "Brochas Avyna – Blending brush Avyna"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Brochas Avyna – Concealer brush",
+                "synonyms": [
+                  "Avyna Brochas Avyna – Concealer brush",
+                  "Brochas Avyna – Concealer brush Avyna"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Brochas Avyna – Foundation brush",
+                "synonyms": [
+                  "Avyna Brochas Avyna – Foundation brush",
+                  "Brochas Avyna – Foundation brush Avyna"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Brochas Avyna – Lip brush",
+                "synonyms": [
+                  "Avyna Brochas Avyna – Lip brush",
+                  "Brochas Avyna – Lip brush Avyna"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Brochas Avyna – Powder brush",
+                "synonyms": [
+                  "Avyna Brochas Avyna – Powder brush",
+                  "Brochas Avyna – Powder brush Avyna"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Brochas Avyna – Small shader brush",
+                "synonyms": [
+                  "Avyna Brochas Avyna – Small shader brush",
+                  "Brochas Avyna – Small shader brush Avyna"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Brochas Avyna – Smudger brush",
+                "synonyms": [
+                  "Avyna Brochas Avyna – Smudger brush",
+                  "Brochas Avyna – Smudger brush Avyna"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Brochas Avyna – Travel brush",
+                "synonyms": [
+                  "Avyna Brochas Avyna – Travel brush",
+                  "Brochas Avyna – Travel brush Avyna"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Fiber Paste 150",
+                "synonyms": [
+                  "Avyna Fiber Paste 150",
+                  "Fiber Paste 150 Avyna",
+                  "Fiber Paste 150 150 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Finale Ialuronico",
+                "synonyms": [
+                  "Avyna Finale Ialuronico",
+                  "Finale Ialuronico Avyna",
+                  "Finale Ialuronico 200 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Finale-X",
+                "synonyms": [
+                  "Avyna Finale-X",
+                  "Finale-X Avyna",
+                  "Finale-X 200 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "FLUIDO DI ARGAN",
+                "synonyms": [
+                  "Avyna FLUIDO DI ARGAN",
+                  "FLUIDO DI ARGAN Avyna",
+                  "FLUIDO DI ARGAN 100 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Fluido di Goji",
+                "synonyms": [
+                  "Avyna Fluido di Goji",
+                  "Fluido di Goji Avyna",
+                  "Fluido di Goji 100 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Fluido Ialuronico",
+                "synonyms": [
+                  "Avyna Fluido Ialuronico",
+                  "Fluido Ialuronico Avyna",
+                  "Fluido Ialuronico 100 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Fluido Platino",
+                "synonyms": [
+                  "Avyna Fluido Platino",
+                  "Fluido Platino Avyna",
+                  "Fluido Platino 100 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "GEL EXTRA FORTE",
+                "synonyms": [
+                  "Avyna GEL EXTRA FORTE",
+                  "GEL EXTRA FORTE Avyna",
+                  "GEL EXTRA FORTE 500 ml",
+                  "GEL EXTRA FORTE 100 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Lacca extra forte",
+                "synonyms": [
+                  "Avyna Lacca extra forte",
+                  "Lacca extra forte Avyna",
+                  "Lacca extra forte 750 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Liquid silk",
+                "synonyms": [
+                  "Avyna Liquid silk",
+                  "Liquid silk Avyna",
+                  "Liquid silk 100 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Lisciante di Argan",
+                "synonyms": [
+                  "Avyna Lisciante di Argan",
+                  "Lisciante di Argan Avyna",
+                  "Lisciante di Argan 1000 ml",
+                  "LISCIANTE DI ARGAN 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Liss Di Lino",
+                "synonyms": [
+                  "Avyna Liss Di Lino",
+                  "Liss Di Lino Avyna",
+                  "Liss Di Lino 150 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Lozione Di Agave",
+                "synonyms": [
+                  "Avyna Lozione Di Agave",
+                  "Lozione Di Agave Avyna",
+                  "Lozione Di Agave 50 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "LOZIONE DI CHERATINA",
+                "synonyms": [
+                  "Avyna LOZIONE DI CHERATINA",
+                  "LOZIONE DI CHERATINA Avyna",
+                  "LOZIONE DI CHERATINA 10 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Maschera Di Agave",
+                "synonyms": [
+                  "Avyna Maschera Di Agave",
+                  "Maschera Di Agave Avyna",
+                  "Maschera Di Agave 500 ml",
+                  "Maschera Di Agave 1000 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "MASCHERA DI ARGAN",
+                "synonyms": [
+                  "Avyna MASCHERA DI ARGAN",
+                  "MASCHERA DI ARGAN Avyna",
+                  "MASCHERA DI ARGAN 250 ml",
+                  "MASCHERA DI ARGAN 1000 ml",
+                  "MASCHERA DI ARGAN 500 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Maschera di Goji",
+                "synonyms": [
+                  "Avyna Maschera di Goji",
+                  "Maschera di Goji Avyna",
+                  "Maschera di Goji 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "MASCHERA Ialuronico",
+                "synonyms": [
+                  "Avyna MASCHERA Ialuronico",
+                  "MASCHERA Ialuronico Avyna",
+                  "MASCHERA Ialuronico 1000 ml",
+                  "maschera Ialuronico 500 ml",
+                  "maschera Ialuronico 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "maschera Platino",
+                "synonyms": [
+                  "Avyna maschera Platino",
+                  "maschera Platino Avyna",
+                  "maschera Platino 250 ml",
+                  "Maschera Platino 500 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "MASCHERA SOLIDA DI ARGAN",
+                "synonyms": [
+                  "Avyna MASCHERA SOLIDA DI ARGAN",
+                  "MASCHERA SOLIDA DI ARGAN Avyna",
+                  "MASCHERA SOLIDA DI ARGAN 52 g"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "MASCHERA SOLIDA DI LITCHI",
+                "synonyms": [
+                  "Avyna MASCHERA SOLIDA DI LITCHI",
+                  "MASCHERA SOLIDA DI LITCHI Avyna",
+                  "MASCHERA SOLIDA DI LITCHI 52 g"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "MASCHERA SOLIDA FRESCHEZZA",
+                "synonyms": [
+                  "Avyna MASCHERA SOLIDA FRESCHEZZA",
+                  "MASCHERA SOLIDA FRESCHEZZA Avyna",
+                  "MASCHERA SOLIDA FRESCHEZZA 52 g"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "MASCHERA SOLIDA IALURONICO",
+                "synonyms": [
+                  "Avyna MASCHERA SOLIDA IALURONICO",
+                  "MASCHERA SOLIDA IALURONICO Avyna",
+                  "MASCHERA SOLIDA IALURONICO 52 g"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Pigmento Zenzero – Azul",
+                "synonyms": [
+                  "Avyna Pigmento Zenzero – Azul",
+                  "Pigmento Zenzero – Azul Avyna",
+                  "Pigmento Zenzero – Azul 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Pigmento Zenzero – Beige",
+                "synonyms": [
+                  "Avyna Pigmento Zenzero – Beige",
+                  "Pigmento Zenzero – Beige Avyna",
+                  "Pigmento Zenzero – Beige 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Pigmento Zenzero – Blanco",
+                "synonyms": [
+                  "Avyna Pigmento Zenzero – Blanco",
+                  "Pigmento Zenzero – Blanco Avyna",
+                  "Pigmento Zenzero – Blanco 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Pigmento Zenzero – Marrone",
+                "synonyms": [
+                  "Avyna Pigmento Zenzero – Marrone",
+                  "Pigmento Zenzero – Marrone Avyna",
+                  "Pigmento Zenzero – Marrone 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Pigmento Zenzero – Rosa",
+                "synonyms": [
+                  "Avyna Pigmento Zenzero – Rosa",
+                  "Pigmento Zenzero – Rosa Avyna",
+                  "Pigmento Zenzero – Rosa 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Pigmento Zenzero – Rosso",
+                "synonyms": [
+                  "Avyna Pigmento Zenzero – Rosso",
+                  "Pigmento Zenzero – Rosso Avyna",
+                  "Pigmento Zenzero – Rosso 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "POZIONE 10",
+                "synonyms": [
+                  "Avyna POZIONE 10",
+                  "POZIONE 10 Avyna",
+                  "POZIONE 10 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Pozione Booster",
+                "synonyms": [
+                  "Avyna Pozione Booster",
+                  "Pozione Booster Avyna",
+                  "Pozione Booster 300 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Pump Ialuronico",
+                "synonyms": [
+                  "Avyna Pump Ialuronico",
+                  "Pump Ialuronico Avyna"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Pumps agave",
+                "synonyms": [
+                  "Avyna Pumps agave",
+                  "Pumps agave Avyna"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Ricostructtore Ialuronico",
+                "synonyms": [
+                  "Avyna Ricostructtore Ialuronico",
+                  "Ricostructtore Ialuronico Avyna",
+                  "Ricostructtore Ialuronico 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "RICOSTRUTTORE DI ARGAN",
+                "synonyms": [
+                  "Avyna RICOSTRUTTORE DI ARGAN",
+                  "RICOSTRUTTORE DI ARGAN Avyna",
+                  "RICOSTRUTTORE DI ARGAN 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Ricostruttore Platino",
+                "synonyms": [
+                  "Avyna Ricostruttore Platino",
+                  "Ricostruttore Platino Avyna",
+                  "Ricostruttore Platino 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "SHAMPOO ABBONDANZA",
+                "synonyms": [
+                  "Avyna SHAMPOO ABBONDANZA",
+                  "SHAMPOO ABBONDANZA Avyna",
+                  "SHAMPOO ABBONDANZA 250 ml",
+                  "SHAMPOO ABBONDANZA 1000 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Shampoo Di Agave",
+                "synonyms": [
+                  "Avyna Shampoo Di Agave",
+                  "Shampoo Di Agave Avyna",
+                  "Shampoo Di Agave 500 ml",
+                  "Shampoo Di Agave 1000 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "SHAMPOO DI ARGAN",
+                "synonyms": [
+                  "Avyna SHAMPOO DI ARGAN",
+                  "SHAMPOO DI ARGAN Avyna",
+                  "SHAMPOO DI ARGAN 250 ml",
+                  "SHAMPOO DI ARGAN 500 ml",
+                  "SHAMPOO DI ARGAN 1000 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Shampoo di Goji",
+                "synonyms": [
+                  "Avyna Shampoo di Goji",
+                  "Shampoo di Goji Avyna",
+                  "Shampoo di Goji 500 ml",
+                  "Shampoo di Goji 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Shampoo Ialuronico",
+                "synonyms": [
+                  "Avyna Shampoo Ialuronico",
+                  "Shampoo Ialuronico Avyna",
+                  "Shampoo Ialuronico 1000 ml",
+                  "Shampoo Ialuronico 500 ml",
+                  "Shampoo Ialuronico 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "shampoo Platino",
+                "synonyms": [
+                  "Avyna shampoo Platino",
+                  "shampoo Platino Avyna",
+                  "shampoo Platino 500 ml",
+                  "Shampoo Platino 250 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "SHAMPOO SOLIDO DI ARGAN",
+                "synonyms": [
+                  "Avyna SHAMPOO SOLIDO DI ARGAN",
+                  "SHAMPOO SOLIDO DI ARGAN Avyna",
+                  "SHAMPOO SOLIDO DI ARGAN 80 g"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "SHAMPOO SOLIDO DI LITCHI",
+                "synonyms": [
+                  "Avyna SHAMPOO SOLIDO DI LITCHI",
+                  "SHAMPOO SOLIDO DI LITCHI Avyna",
+                  "SHAMPOO SOLIDO DI LITCHI 80 g"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "SHAMPOO SOLIDO FRESCHEZZA",
+                "synonyms": [
+                  "Avyna SHAMPOO SOLIDO FRESCHEZZA",
+                  "SHAMPOO SOLIDO FRESCHEZZA Avyna",
+                  "SHAMPOO SOLIDO FRESCHEZZA 80 g"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "SHAMPOO SOLIDO IALURONICO",
+                "synonyms": [
+                  "Avyna SHAMPOO SOLIDO IALURONICO",
+                  "SHAMPOO SOLIDO IALURONICO Avyna",
+                  "SHAMPOO SOLIDO IALURONICO 80 g"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Wet Look",
+                "synonyms": [
+                  "Avyna Wet Look",
+                  "Wet Look Avyna",
+                  "Wet Look 300 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Xtyling Curly",
+                "synonyms": [
+                  "Avyna Xtyling Curly",
+                  "Xtyling Curly Avyna",
+                  "Xtyling Curly 300 ml"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Xtyling Mousse",
+                "synonyms": [
+                  "Avyna Xtyling Mousse",
+                  "Xtyling Mousse Avyna",
+                  "Xtyling Mousse 300 ml"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "estilista",
+          "values": [
+            {
+              "name": {
+                "value": "Ana",
+                "synonyms": [
+                  "Anita",
+                  "con Ana",
+                  "estilista Ana"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "María",
+                "synonyms": [
+                  "Maria",
+                  "Mari",
+                  "Mary",
+                  "con María",
+                  "estilista María"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Carlos",
+                "synonyms": [
+                  "Carlitos",
+                  "con Carlos",
+                  "estilista Carlos"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "estilista disponible",
+                "synonyms": [
+                  "cualquier estilista",
+                  "el que esté disponible",
+                  "quien pueda atenderme",
+                  "estilista libre"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "sin preferencia",
+                "synonyms": [
+                  "cualquiera",
+                  "no tengo preferencia",
+                  "me da igual",
+                  "el disponible"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "clienteRegistrado",
+          "values": [
+            {
+              "name": {
+                "value": "sí",
+                "synonyms": [
+                  "si",
+                  "claro",
+                  "correcto",
+                  "ya estoy registrado",
+                  "tengo cuenta",
+                  "ya tengo cuenta"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "no",
+                "synonyms": [
+                  "no tengo cuenta",
+                  "no estoy registrado",
+                  "todavía no",
+                  "no me he registrado",
+                  "es mi primera visita"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "dialog": {
+      "delegationStrategy": "SKILL_RESPONSE",
+      "intents": [
+        {
+          "name": "AgendarCitaIntent",
+          "confirmationRequired": false,
+          "prompts": {},
+          "slots": [
+            {
+              "name": "servicio",
+              "type": "servicio",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": {
+                "elicitation": "Elicit.Slot.Servicio"
+              }
+            },
+            {
+              "name": "tipoServicio",
+              "type": "tiposervicio",
+              "elicitationRequired": false,
+              "confirmationRequired": false,
+              "prompts": {}
+            },
+            {
+              "name": "dia",
+              "type": "AMAZON.DATE",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": {
+                "elicitation": "Elicit.Slot.Dia"
+              }
+            },
+            {
+              "name": "hora",
+              "type": "AMAZON.TIME",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": {
+                "elicitation": "Elicit.Slot.Hora"
+              }
+            },
+            {
+              "name": "estilista",
+              "type": "estilista",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": {
+                "elicitation": "Elicit.Slot.Estilista"
+              }
+            },
+            {
+              "name": "clienteRegistrado",
+              "type": "clienteRegistrado",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": {
+                "elicitation": "Elicit.Slot.Cliente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "prompts": [
+      {
+        "id": "Elicit.Slot.Servicio",
+        "variations": [
+          {
+            "type": "PlainText",
+            "value": "¿Para qué servicio deseas la cita?"
+          }
+        ]
+      },
+      {
+        "id": "Elicit.Slot.Dia",
+        "variations": [
+          {
+            "type": "PlainText",
+            "value": "¿Qué día te gustaría venir?"
+          }
+        ]
+      },
+      {
+        "id": "Elicit.Slot.Hora",
+        "variations": [
+          {
+            "type": "PlainText",
+            "value": "¿A qué hora prefieres tu cita?"
+          }
+        ]
+      },
+      {
+        "id": "Elicit.Slot.Estilista",
+        "variations": [
+          {
+            "type": "PlainText",
+            "value": "¿Con qué estilista deseas tu cita?"
+          }
+        ]
+      },
+      {
+        "id": "Elicit.Slot.Cliente",
+        "variations": [
+          {
+            "type": "PlainText",
+            "value": "¿Ya eres cliente registrado?"
+          }
+        ]
+      }
+    ]
+  }
+}

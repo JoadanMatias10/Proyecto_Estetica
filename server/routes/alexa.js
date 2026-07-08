@@ -93,23 +93,28 @@ function buildAppointmentResponse(appointment) {
   };
 }
 
-async function sendAlexaCodeEmail(user, code) {
+async function sendAlexaCodeEmail(user, code, context = "client") {
   if (!isBrevoConfigured()) {
     throw new Error("El envío de correos no está configurado en el servidor.");
   }
 
-  const name = [user.nombre, user.apellidoPaterno].filter(Boolean).join(" ") || "cliente";
+  const isStylist = context === "stylist";
+  const name = [user.nombre, user.apellidoPaterno].filter(Boolean).join(" ") || (isStylist ? "estilista" : "cliente");
   const minutes = CODE_EXPIRATION_MINUTES;
+  const subject = isStylist ? "Código para entrar al panel de estilista" : "Código para agendar por Alexa";
+  const actionText = isStylist
+    ? "entrar al panel de estilista por Alexa"
+    : "continuar con Alexa";
 
   return sendTransactionalEmail({
     to: { email: user.correo, name },
-    subject: "Código para agendar por Alexa",
-    textContent: `Tu código para agendar por Alexa es ${code}. Vence en ${minutes} minutos.`,
+    subject,
+    textContent: `Tu código para ${actionText} es ${code}. Vence en ${minutes} minutos.`,
     htmlContent: `
       <div style="font-family:Arial,sans-serif;color:#24141f;line-height:1.5">
         <h2 style="color:#8a3b64">Estética Panamericana</h2>
         <p>Hola ${name},</p>
-        <p>Tu código para continuar con Alexa es:</p>
+        <p>Tu código para ${actionText} es:</p>
         <p style="font-size:32px;font-weight:700;letter-spacing:6px;color:#8a3b64">${code}</p>
         <p>Este código vence en ${minutes} minutos. Si no lo solicitaste, puedes ignorar este correo.</p>
       </div>
@@ -117,7 +122,7 @@ async function sendAlexaCodeEmail(user, code) {
   });
 }
 
-async function findClientByIdentifier(identifier) {
+async function findUserByIdentifierAndRole(identifier, role) {
   const normalized = normalizeIdentifier(identifier);
   if (!normalized) return null;
 
@@ -127,9 +132,17 @@ async function findClientByIdentifier(identifier) {
 
   return User.findOne({
     ...query,
-    role: "client",
+    role,
     accountStatus: "active",
   });
+}
+
+async function findClientByIdentifier(identifier) {
+  return findUserByIdentifierAndRole(identifier, "client");
+}
+
+async function findStylistByIdentifier(identifier) {
+  return findUserByIdentifierAndRole(identifier, "stylist");
 }
 
 async function listActiveStylists() {
@@ -326,6 +339,105 @@ async function authenticateAlexaSession(req, res, next) {
   return next();
 }
 
+function normalizeAlexaAppointmentStatus(value) {
+  const status = normalizeString(value).toLowerCase();
+  if (!status || status === "todos") return "";
+  if (status === "programada") return "pendiente";
+  return ["pendiente", "confirmada", "completada", "cancelada"].includes(status) ? status : "";
+}
+
+function buildAlexaStylistDateFilter(query, res) {
+  const desdeRaw = normalizeString(query.desde || "");
+  const hastaRaw = normalizeString(query.hasta || desdeRaw);
+  const filter = {};
+
+  if (!desdeRaw && !hastaRaw) {
+    return filter;
+  }
+
+  const desde = parseDateKey(desdeRaw);
+  const hasta = parseDateKey(hastaRaw || desdeRaw);
+
+  if (!desde || !hasta) {
+    res.status(400).json({ errors: ["Fecha inválida para consultar citas."] });
+    return null;
+  }
+
+  if (desde > hasta) {
+    res.status(400).json({ errors: ["La fecha inicial no puede ser mayor que la final."] });
+    return null;
+  }
+
+  filter.fechaHora = {
+    $gte: getStartOfDay(desde),
+    $lte: getEndOfDay(hasta),
+  };
+  return filter;
+}
+
+function buildAlexaStylistAppointmentResponse(appointment) {
+  const client = appointment.userId && typeof appointment.userId === "object"
+    ? appointment.userId
+    : null;
+  const fechaHora = appointment.fechaHora ? new Date(appointment.fechaHora) : null;
+  const cliente = client
+    ? [client.nombre, client.apellidoPaterno, client.apellidoMaterno]
+      .map((part) => normalizeString(part))
+      .filter(Boolean)
+      .join(" ") || "Cliente"
+    : "Cliente";
+
+  return {
+    id: String(appointment._id),
+    cliente,
+    clienteCorreo: client?.correo || "",
+    clienteTelefono: client?.telefono || "",
+    servicio: appointment.servicio || "",
+    fechaHora: appointment.fechaHora,
+    fecha: fechaHora ? fechaHora.toISOString().slice(0, 10) : "",
+    hora: fechaHora ? fechaHora.toTimeString().slice(0, 5) : "",
+    estado: appointment.estado === "programada" ? "pendiente" : appointment.estado || "pendiente",
+    notas: appointment.notas || "",
+  };
+}
+
+async function authenticateAlexaStylistSession(req, res, next) {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  const tokenHash = hashValue(token);
+
+  if (!tokenHash) {
+    return res.status(401).json({ errors: ["Sesión de estilista requerida."] });
+  }
+
+  const record = await AlexaAccessCode.findOne({
+    sessionTokenHash: tokenHash,
+    sessionExpiresAt: { $gt: new Date() },
+    usedAt: { $ne: null },
+  }).lean();
+
+  if (!record) {
+    return res.status(401).json({ errors: ["Sesión de estilista vencida o inválida."] });
+  }
+
+  const user = await User.findOne({
+    _id: record.userId,
+    role: "stylist",
+    accountStatus: "active",
+  });
+
+  if (!user) {
+    return res.status(403).json({ errors: ["Estilista no disponible."] });
+  }
+
+  req.stylistUser = user;
+  req.stylist = {
+    id: String(user._id),
+    correo: user.correo,
+    role: user.role,
+  };
+  return next();
+}
 router.post("/auth/start", async (req, res) => {
   try {
     const identifier = normalizeIdentifier(req.body?.identifier || req.body?.identificador || "");
@@ -433,6 +545,157 @@ router.post("/auth/verify", async (req, res) => {
   }
 });
 
+router.post("/stylist/auth/start", async (req, res) => {
+  try {
+    const identifier = normalizeIdentifier(req.body?.identifier || req.body?.identificador || "");
+    if (!identifier) {
+      return res.status(400).json({ errors: ["Dime tu correo o teléfono registrado como estilista."] });
+    }
+
+    const isEmail = identifier.includes("@");
+    if (!isEmail && identifier.length !== 10) {
+      return res.status(400).json({ errors: ["El teléfono debe tener 10 dígitos."] });
+    }
+
+    const user = await findStylistByIdentifier(identifier);
+    if (!user) {
+      return res.status(404).json({ errors: ["No encontré una cuenta de estilista activa con ese dato."] });
+    }
+    if (!user.correo) {
+      return res.status(400).json({ errors: ["La cuenta de estilista no tiene correo para recibir el código."] });
+    }
+
+    const now = new Date();
+    const code = generateCode();
+    const record = await AlexaAccessCode.create({
+      userId: user._id,
+      identifier,
+      codeHash: hashValue(code),
+      expiresAt: addMinutes(now, CODE_EXPIRATION_MINUTES),
+      attempts: 0,
+    });
+
+    await sendAlexaCodeEmail(user, code, "stylist");
+
+    return res.status(201).json({
+      message: "Código enviado.",
+      challengeId: String(record._id),
+      expiresInMinutes: CODE_EXPIRATION_MINUTES,
+      delivery: maskEmail(user.correo),
+      userHint: {
+        nombre: user.nombre || "",
+        role: "stylist",
+      },
+    });
+  } catch (error) {
+    console.error("Error en /api/alexa/stylist/auth/start:", error);
+    return res.status(500).json({ errors: [error.message || "No fue posible enviar el código de estilista."] });
+  }
+});
+
+router.post("/stylist/auth/verify", async (req, res) => {
+  try {
+    const challengeId = normalizeString(req.body?.challengeId || "");
+    const code = normalizeString(req.body?.code || req.body?.codigo || "").replace(/\D/g, "");
+
+    if (!isValidId(challengeId)) {
+      return res.status(400).json({ errors: ["Solicitud de código inválida."] });
+    }
+    if (!/^\d{6}$/.test(code)) {
+      return res.status(400).json({ errors: ["El código debe tener 6 dígitos."] });
+    }
+
+    const record = await AlexaAccessCode.findOne({
+      _id: challengeId,
+      usedAt: null,
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!record) {
+      return res.status(404).json({ errors: ["El código venció o no existe. Solicita uno nuevo."] });
+    }
+    if (record.attempts >= MAX_CODE_ATTEMPTS) {
+      return res.status(429).json({ errors: ["Demasiados intentos. Solicita un código nuevo."] });
+    }
+
+    if (record.codeHash !== hashValue(code)) {
+      record.attempts += 1;
+      await record.save();
+      return res.status(401).json({ errors: ["Código incorrecto."] });
+    }
+
+    const user = await User.findOne({
+      _id: record.userId,
+      role: "stylist",
+      accountStatus: "active",
+    });
+    if (!user) {
+      return res.status(403).json({ errors: ["Estilista no disponible."] });
+    }
+
+    const rawToken = generateSessionToken();
+    const sessionExpiresAt = addMinutes(new Date(), SESSION_EXPIRATION_MINUTES);
+    record.usedAt = new Date();
+    record.sessionTokenHash = hashValue(rawToken);
+    record.sessionExpiresAt = sessionExpiresAt;
+    record.expiresAt = sessionExpiresAt;
+    await record.save();
+
+    return res.json({
+      message: "Estilista validado.",
+      token: rawToken,
+      expiresInMinutes: SESSION_EXPIRATION_MINUTES,
+      user: buildUserResponse(user),
+    });
+  } catch (error) {
+    console.error("Error en /api/alexa/stylist/auth/verify:", error);
+    return res.status(500).json({ errors: ["No fue posible verificar el código de estilista."] });
+  }
+});
+
+router.get("/stylist/me", authenticateAlexaStylistSession, async (req, res) => {
+  const staff = await StaffMember.findOne({ userId: req.stylist.id }).lean();
+  return res.json({
+    user: buildUserResponse(req.stylistUser),
+    staff: staff
+      ? {
+        id: String(staff._id),
+        nombre: staff.nombre || "",
+        rol: staff.rol || "",
+        email: staff.email || "",
+        telefono: staff.telefono || "",
+        estado: staff.estado || "",
+      }
+      : null,
+  });
+});
+
+router.get("/stylist/appointments", authenticateAlexaStylistSession, async (req, res) => {
+  const dateFilter = buildAlexaStylistDateFilter(req.query, res);
+  if (!dateFilter) return null;
+
+  const estado = normalizeAlexaAppointmentStatus(req.query.estado || "");
+  const filter = {
+    stylistId: new mongoose.Types.ObjectId(req.stylist.id),
+    ...dateFilter,
+  };
+
+  if (estado) {
+    filter.estado = estado === "pendiente" ? { $in: ["pendiente", "programada"] } : estado;
+  }
+
+  const appointments = await Appointment.find(filter)
+    .populate("userId", "nombre apellidoPaterno apellidoMaterno correo telefono")
+    .sort({ fechaHora: 1, createdAt: -1 })
+    .lean();
+
+  return res.json({
+    appointments: appointments.map(buildAlexaStylistAppointmentResponse),
+    total: appointments.length,
+    desde: normalizeString(req.query.desde || ""),
+    hasta: normalizeString(req.query.hasta || req.query.desde || ""),
+  });
+});
 router.use(authenticateAlexaSession);
 
 router.get("/me", async (req, res) => {

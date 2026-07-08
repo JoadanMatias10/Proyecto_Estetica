@@ -6,6 +6,7 @@ const detailDocument = require('../apl/detail.json');
 const infoDocument = require('../apl/info.json');
 const appointmentDocument = require('../apl/appointment.json');
 const goodbyeDocument = require('../apl/goodbye.json');
+const stylistDashboardDocument = require('../apl/stylistDashboard.json');
 
 const DOCUMENTS = {
     welcome: welcomeDocument,
@@ -13,7 +14,8 @@ const DOCUMENTS = {
     detail: detailDocument,
     info: infoDocument,
     appointment: appointmentDocument,
-    goodbye: goodbyeDocument
+    goodbye: goodbyeDocument,
+    stylistDashboard: stylistDashboardDocument
 };
 
 function supportsAPL(handlerInput) {
@@ -210,18 +212,32 @@ function appointmentData(draft = {}, prompt = '', options = [], availabilityText
         value: '',
         enabled: false
     });
+    const authMode = draft.authMode || '';
+    const authDigits = String(draft.authDigits || '').replace(/\D/g, '').slice(0, authMode === 'code' ? 6 : 10);
+    const authTargetLength = authMode === 'code' ? 6 : 10;
+    const authDisplay = authDigits || (authMode === 'code' ? 'Código de 6 dígitos' : 'Teléfono de 10 dígitos');
 
     return {
         brand: 'ESTÉTICA PANAMERICANA',
-        title: draft.complete ? 'Solicitud registrada' : 'Agenda tu cita',
+        title: draft.title || (draft.complete ? 'Solicitud registrada' : 'Agenda tu cita'),
         subtitle: draft.complete
             ? 'Guardamos los datos de tu solicitud.'
-            : 'Te guiaré paso a paso. Puedes responder usando tu voz.',
+            : 'Te guiaré paso a paso. Puedes responder usando tu voz o tocando la pantalla.',
         prompt,
         status: draft.status || '',
         complete: Boolean(draft.complete),
         availabilityText,
         summaryText: availabilityText ? `${summaryText}\n\n${availabilityText}` : summaryText,
+        authMode: Boolean(authMode),
+        authKind: authMode,
+        authTitle: authMode === 'code' ? 'Código de verificación' : 'Teléfono registrado',
+        authInstruction: authMode === 'code'
+            ? 'Toca el código de 6 dígitos que llegó a tu correo.'
+            : 'Toca tu teléfono registrado de 10 dígitos o dilo por voz.',
+        authDigits,
+        authDisplay,
+        authProgress: `${authDigits.length}/${authTargetLength}`,
+        authCanSubmit: authDigits.length === authTargetLength,
         option1Label: normalizedOptions[0].label,
         option1Action: normalizedOptions[0].action,
         option1Field: normalizedOptions[0].field,
@@ -249,6 +265,46 @@ function appointmentData(draft = {}, prompt = '', options = [], availabilityText
     };
 }
 
+function stylistDashboardData({
+    user = {},
+    staff = null,
+    appointments = [],
+    dateLabel = '',
+    dateHint = 'Consulta por voz o usando los botones.',
+    dateValue = ''
+} = {}) {
+    const displayName = [user.nombre, user.apellidoPaterno].filter(Boolean).join(' ')
+        || (staff && staff.nombre)
+        || 'estilista';
+    const normalizedAppointments = appointments.map((appointment) => ({
+        id: appointment.id || '',
+        cliente: appointment.cliente || 'Cliente',
+        contacto: appointment.contacto || appointment.clienteTelefono || appointment.clienteCorreo || 'Sin contacto visible',
+        servicio: appointment.servicio || 'Servicio',
+        horaLabel: appointment.horaLabel || appointment.hora || '',
+        estadoLabel: appointment.estadoLabel || appointment.estado || 'Pendiente',
+        notas: appointment.notas || '',
+        accent: appointment.accent || '#F0A6B8',
+        accentSoft: appointment.accentSoft || '#51243E'
+    }));
+    const total = normalizedAppointments.length;
+
+    return {
+        brand: 'ESTÃ‰TICA PANAMERICANA',
+        title: 'Panel de estilista',
+        subtitle: `Hola ${displayName}. Estas son tus citas asignadas.`,
+        dateLabel,
+        dateHint,
+        dateValue,
+        total,
+        totalLabel: total === 1 ? 'cita' : 'citas',
+        hasAppointments: total > 0,
+        emptyMessage: `No tienes citas asignadas para ${dateLabel || 'esta fecha'}.`,
+        appointments: normalizedAppointments,
+        footerHint: 'Puedes decir: "mis citas de hoy", "mis citas de mañana" o "qué cita tengo a las diez".'
+    };
+}
+
 function goodbyeData() {
     return {
         brand: 'ESTÉTICA PANAMERICANA',
@@ -266,5 +322,8 @@ module.exports = {
     detailData,
     infoData,
     appointmentData,
+    stylistDashboardData,
     goodbyeData
 };
+
+
