@@ -192,6 +192,118 @@ async function getAvailabilityForStylist(stylistId) {
   return record || getDefaultAvailability(stylistId);
 }
 
+const ALEXA_TIME_ZONE = "America/Mexico_City";
+const ALEXA_DATE_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/;
+const ALEXA_TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/;
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function normalizeAlexaTimeKey(value) {
+  const raw = normalizeString(value || "");
+  const match = raw.match(ALEXA_TIME_REGEX);
+  return match ? `${match[1]}:${match[2]}` : "";
+}
+
+function getAlexaZonedParts(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: ALEXA_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const mapped = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return {
+    year: Number(mapped.year),
+    month: Number(mapped.month),
+    day: Number(mapped.day),
+    hour: Number(mapped.hour === "24" ? "00" : mapped.hour),
+    minute: Number(mapped.minute),
+    second: Number(mapped.second || 0),
+  };
+}
+
+function formatAlexaDateKey(value) {
+  const parts = getAlexaZonedParts(value);
+  return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}`;
+}
+
+function formatAlexaTimeKey(value) {
+  const parts = getAlexaZonedParts(value);
+  return `${pad2(parts.hour)}:${pad2(parts.minute)}`;
+}
+
+function getAlexaTimeZoneOffsetMs(date) {
+  const parts = getAlexaZonedParts(date);
+  const zonedAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  return zonedAsUtc - date.getTime();
+}
+
+function buildAlexaUtcDateTime(dateKey, timeKey) {
+  const dateMatch = normalizeString(dateKey).match(ALEXA_DATE_REGEX);
+  const normalizedTime = normalizeAlexaTimeKey(timeKey);
+  if (!dateMatch || !normalizedTime) return null;
+
+  const [, year, month, day] = dateMatch;
+  const [hours, minutes] = normalizedTime.split(":").map(Number);
+  const utcGuess = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), hours, minutes, 0, 0));
+  const offset = getAlexaTimeZoneOffsetMs(utcGuess);
+  return new Date(utcGuess.getTime() - offset);
+}
+
+function validateAlexaDateTime(dateValue, timeValue, errors) {
+  const dateKey = normalizeString(dateValue || "");
+  const timeKey = normalizeAlexaTimeKey(timeValue || "");
+
+  if (!dateKey) errors.push("Fecha es obligatoria.");
+  if (!timeKey) errors.push("Hora es obligatoria.");
+  if (!dateKey || !timeKey) return null;
+
+  if (!ALEXA_DATE_REGEX.test(dateKey)) {
+    errors.push("Fecha inválida.");
+    return null;
+  }
+
+  const fechaHora = buildAlexaUtcDateTime(dateKey, timeKey);
+  if (!fechaHora || Number.isNaN(fechaHora.getTime())) {
+    errors.push("Fecha u hora inválida.");
+    return null;
+  }
+
+  if (fechaHora < new Date()) {
+    errors.push("La fecha y hora deben ser futuras.");
+    return null;
+  }
+
+  return { fechaHora, dateKey, timeKey };
+}
+
+function getAlexaDateRange(dateKey) {
+  const start = buildAlexaUtcDateTime(dateKey, "00:00");
+  const end = buildAlexaUtcDateTime(dateKey, "23:59");
+  if (end) end.setUTCSeconds(59, 999);
+  return { start, end };
+}
+
+function toAlexaAvailabilityDate(value) {
+  const parts = getAlexaZonedParts(value);
+  return new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second || 0, 0);
+}
+
+function mapAppointmentsToAlexaAvailability(appointments = []) {
+  return appointments.map((appointment) => ({
+    ...appointment,
+    fechaHora: appointment.fechaHora ? toAlexaAvailabilityDate(appointment.fechaHora) : appointment.fechaHora,
+  }));
+}
+
 async function getStylistAppointmentsInRange(stylistId, fromDate, toDate, excludeAppointmentId = "") {
   const query = {
     stylistId: new mongoose.Types.ObjectId(stylistId),
@@ -204,17 +316,39 @@ async function getStylistAppointmentsInRange(stylistId, fromDate, toDate, exclud
   return Appointment.find(query).select("fechaHora estado duracionMinutos").lean();
 }
 
+async function getAlexaStylistAppointmentsForDate(stylistId, dateKey, excludeAppointmentId = "") {
+  const range = getAlexaDateRange(dateKey);
+  if (!range.start || !range.end) return [];
+
+  const query = {
+    stylistId: new mongoose.Types.ObjectId(stylistId),
+    fechaHora: { $gte: range.start, $lte: range.end },
+    estado: { $ne: "cancelada" },
+  };
+  if (excludeAppointmentId && isValidId(excludeAppointmentId)) {
+    query._id = { $ne: new mongoose.Types.ObjectId(excludeAppointmentId) };
+  }
+
+  const appointments = await Appointment.find(query).select("fechaHora estado duracionMinutos").lean();
+  return mapAppointmentsToAlexaAvailability(appointments);
+}
+
 async function buildAvailabilityDays({ stylistId, desde, hasta, durationMinutes = null }) {
   const availability = await getAvailabilityForStylist(stylistId);
-  const appointments = await getStylistAppointmentsInRange(stylistId, desde, hasta);
-  return buildDateRange(desde, hasta).map((dateKey) =>
-    buildAvailableSlotsForDate({
+  const dateKeys = buildDateRange(desde, hasta);
+  const days = [];
+
+  for (const dateKey of dateKeys) {
+    const appointments = await getAlexaStylistAppointmentsForDate(stylistId, dateKey);
+    days.push(buildAvailableSlotsForDate({
       availability,
       dateKey,
       appointments,
       durationMinutes,
-    })
-  );
+    }));
+  }
+
+  return days;
 }
 
 async function resolveAppointmentService({ serviceId, servicio }, errors) {
@@ -255,16 +389,18 @@ async function resolveAppointmentService({ serviceId, servicio }, errors) {
   };
 }
 
-async function findAvailableStylistForAppointment(fechaHora, durationMinutes) {
+async function findAvailableStylistForAppointment(fechaHora, durationMinutes, requestedDateKey = "", requestedTimeKey = "") {
   const stylists = await listActiveStylists();
   if (!stylists.length) return null;
 
-  const dateKey = toLocalDateKey(fechaHora);
-  const timeKey = `${String(fechaHora.getHours()).padStart(2, "0")}:${String(fechaHora.getMinutes()).padStart(2, "0")}`;
+  const dateKey = requestedDateKey || toLocalDateKey(fechaHora);
+  const timeKey = requestedTimeKey || `${String(fechaHora.getHours()).padStart(2, "0")}:${String(fechaHora.getMinutes()).padStart(2, "0")}`;
 
   for (const stylist of stylists) {
     const availability = await getAvailabilityForStylist(stylist.id);
-    const appointments = await getStylistAppointmentsInRange(stylist.id, fechaHora, fechaHora);
+    const appointments = requestedDateKey
+      ? await getAlexaStylistAppointmentsForDate(stylist.id, requestedDateKey)
+      : await getStylistAppointmentsInRange(stylist.id, fechaHora, fechaHora);
     const dayAvailability = buildAvailableSlotsForDate({ availability, dateKey, appointments, durationMinutes });
     if (dayAvailability.slots.includes(timeKey)) {
       return new mongoose.Types.ObjectId(stylist.id);
@@ -274,7 +410,7 @@ async function findAvailableStylistForAppointment(fechaHora, durationMinutes) {
   return null;
 }
 
-async function ensureStylistAvailable(stylistId, fechaHora, durationMinutes) {
+async function ensureStylistAvailable(stylistId, fechaHora, durationMinutes, requestedDateKey = "", requestedTimeKey = "") {
   if (!stylistId || !isValidId(stylistId)) {
     return { ok: false, errors: ["Selecciona un estilista válido."] };
   }
@@ -285,10 +421,12 @@ async function ensureStylistAvailable(stylistId, fechaHora, durationMinutes) {
     return { ok: false, errors: ["El estilista seleccionado no está disponible."] };
   }
 
-  const dateKey = toLocalDateKey(fechaHora);
-  const timeKey = `${String(fechaHora.getHours()).padStart(2, "0")}:${String(fechaHora.getMinutes()).padStart(2, "0")}`;
+  const dateKey = requestedDateKey || toLocalDateKey(fechaHora);
+  const timeKey = requestedTimeKey || `${String(fechaHora.getHours()).padStart(2, "0")}:${String(fechaHora.getMinutes()).padStart(2, "0")}`;
   const availability = await getAvailabilityForStylist(stylistId);
-  const appointments = await getStylistAppointmentsInRange(stylistId, fechaHora, fechaHora);
+  const appointments = requestedDateKey
+    ? await getAlexaStylistAppointmentsForDate(stylistId, requestedDateKey)
+    : await getStylistAppointmentsInRange(stylistId, fechaHora, fechaHora);
   const dayAvailability = buildAvailableSlotsForDate({ availability, dateKey, appointments, durationMinutes });
 
   if (!dayAvailability.slots.includes(timeKey)) {
@@ -368,9 +506,11 @@ function buildAlexaStylistDateFilter(query, res) {
     return null;
   }
 
+  const startRange = getAlexaDateRange(desdeRaw);
+  const endRange = getAlexaDateRange(hastaRaw || desdeRaw);
   filter.fechaHora = {
-    $gte: getStartOfDay(desde),
-    $lte: getEndOfDay(hasta),
+    $gte: startRange.start,
+    $lte: endRange.end,
   };
   return filter;
 }
@@ -394,8 +534,8 @@ function buildAlexaStylistAppointmentResponse(appointment) {
     clienteTelefono: client?.telefono || "",
     servicio: appointment.servicio || "",
     fechaHora: appointment.fechaHora,
-    fecha: fechaHora ? fechaHora.toISOString().slice(0, 10) : "",
-    hora: fechaHora ? fechaHora.toTimeString().slice(0, 5) : "",
+    fecha: fechaHora ? formatAlexaDateKey(fechaHora) : "",
+    hora: fechaHora ? formatAlexaTimeKey(fechaHora) : "",
     estado: appointment.estado === "programada" ? "pendiente" : appointment.estado || "pendiente",
     notas: appointment.notas || "",
   };
@@ -755,7 +895,8 @@ router.post("/appointments", async (req, res) => {
   const errors = [];
   const { serviceId, servicio, fecha, hora, notas, stylistId } = req.body;
 
-  const fechaHora = validateDateTime(fecha, hora, errors);
+  const dateTimeContext = validateAlexaDateTime(fecha, hora, errors);
+  const fechaHora = dateTimeContext && dateTimeContext.fechaHora;
   validateNotes(notas, errors);
   const serviceContext = await resolveAppointmentService({ serviceId, servicio }, errors);
 
@@ -765,12 +906,23 @@ router.post("/appointments", async (req, res) => {
 
   let selectedStylistId = normalizeString(stylistId);
   if (selectedStylistId) {
-    const availabilityResult = await ensureStylistAvailable(selectedStylistId, fechaHora, serviceContext.duracionMinutos);
+    const availabilityResult = await ensureStylistAvailable(
+      selectedStylistId,
+      fechaHora,
+      serviceContext.duracionMinutos,
+      dateTimeContext.dateKey,
+      dateTimeContext.timeKey
+    );
     if (!availabilityResult.ok) {
       return res.status(400).json({ errors: availabilityResult.errors });
     }
   } else {
-    const availableStylistId = await findAvailableStylistForAppointment(fechaHora, serviceContext.duracionMinutos);
+    const availableStylistId = await findAvailableStylistForAppointment(
+      fechaHora,
+      serviceContext.duracionMinutos,
+      dateTimeContext.dateKey,
+      dateTimeContext.timeKey
+    );
     if (!availableStylistId) {
       return res.status(400).json({ errors: ["No hay estilistas disponibles en ese horario."] });
     }
