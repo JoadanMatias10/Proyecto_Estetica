@@ -18,6 +18,7 @@ const ACCOUNT_STATUS = {
 };
 const INVITE_EXPIRATION_MS = 1000 * 60 * 60 * 24 * 7;
 const PASSWORD_RESET_EXPIRATION_MS = 1000 * 60 * 60 * 2;
+const DEFAULT_APP_BASE_URL = "https://proyecto-estetica.vercel.app";
 
 function mapStaffRoleToUserRole(staffRole) {
   return STAFF_ROLE_TO_USER_ROLE[String(staffRole || "").trim()] || null;
@@ -36,7 +37,8 @@ function canUseAdminPanel(role) {
 }
 
 function normalizeAppBaseUrl(value) {
-  return String(value || "http://localhost:3000").trim().replace(/\/+$/, "");
+  const baseUrl = String(value || "").trim() || DEFAULT_APP_BASE_URL;
+  return baseUrl.replace(/\/+$/, "");
 }
 
 function buildAppUrl(pathname, params = {}) {
