@@ -9,6 +9,7 @@ import {
   getClientPayments,
   getClientToken,
   getStoredClientUser,
+  saveClientPayments,
 } from "../utils/clientStore";
 
 function formatAppointment(appointment) {
@@ -44,18 +45,26 @@ export default function DashboardCliente() {
   }, []);
 
   useEffect(() => {
-    const loadAppointments = async () => {
+    const loadClientData = async () => {
       const token = getClientToken();
       if (!token) return;
-      try {
-        const data = await requestJson(endpoints.clientAppointments, { token });
-        setAppointments(Array.isArray(data.appointments) ? data.appointments : []);
-      } catch (_error) {
+      const [appointmentsResult, paymentsResult] = await Promise.allSettled([
+        requestJson(endpoints.clientAppointments, { token }),
+        requestJson(endpoints.clientPayments, { token }),
+      ]);
+
+      if (appointmentsResult.status === "fulfilled") {
+        setAppointments(Array.isArray(appointmentsResult.value.appointments) ? appointmentsResult.value.appointments : []);
+      } else {
         setAppointments([]);
+      }
+
+      if (paymentsResult.status === "fulfilled") {
+        setPayments(saveClientPayments(Array.isArray(paymentsResult.value.payments) ? paymentsResult.value.payments : []));
       }
     };
 
-    loadAppointments();
+    loadClientData();
   }, []);
 
   const nextAppointment = useMemo(() => {

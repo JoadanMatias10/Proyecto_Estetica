@@ -4,10 +4,11 @@ import { endpoints, requestJson } from "../../api";
 import Button from "../../components/ui/Button";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import {
-  addClientPayment,
+  cacheClientPayment,
   clearClientCart,
   getCartSummary,
   getClientCart,
+  getClientToken,
 } from "../../utils/clientStore";
 import { formatProductPresentation } from "../../utils/productPresentation";
 
@@ -24,7 +25,9 @@ export default function PagoProducto({ mode = "product" }) {
   const [quantity, setQuantity] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState("Tarjeta");
   const [isLoading, setIsLoading] = useState(!isCartPayment);
+  const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [paymentError, setPaymentError] = useState("");
 
   useEffect(() => {
     if (isCartPayment) {
@@ -76,26 +79,37 @@ export default function PagoProducto({ mode = "product" }) {
     ];
   }, [cart, isCartPayment, product, quantity]);
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
     if (summary.subtotal <= 0 || detail.length === 0) return;
 
-    addClientPayment({
-      tipo: "Producto",
-      concepto: isCartPayment
-        ? `Carrito (${summary.totalItems} ${summary.totalItems === 1 ? "producto" : "productos"})`
-        : product.nombre,
-      total: summary.subtotal,
-      metodo: paymentMethod,
-      estatus: "Pagado",
-      detalle: detail,
-    });
+    setIsSaving(true);
+    setPaymentError("");
+    try {
+      const data = await requestJson(endpoints.clientPayments, {
+        method: "POST",
+        token: getClientToken(),
+        body: {
+          tipo: "Producto",
+          metodo: paymentMethod,
+          detalle: detail,
+        },
+      });
 
-    if (isCartPayment) {
-      clearClientCart();
-      setCart([]);
+      if (data.payment) {
+        cacheClientPayment(data.payment);
+      }
+
+      if (isCartPayment) {
+        clearClientCart();
+        setCart([]);
+      }
+
+      navigate("/cliente/pagos");
+    } catch (error) {
+      setPaymentError(error.message || "No fue posible registrar el pago.");
+    } finally {
+      setIsSaving(false);
     }
-
-    navigate("/cliente/pagos");
   };
 
   if (isLoading) {
@@ -138,6 +152,12 @@ export default function PagoProducto({ mode = "product" }) {
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="card p-6 space-y-5">
           <h2 className="section-title">Detalle</h2>
+
+          {paymentError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              {paymentError}
+            </div>
+          )}
 
           {isCartPayment ? (
             <div className="divide-y divide-slate-100">
@@ -211,8 +231,8 @@ export default function PagoProducto({ mode = "product" }) {
             </div>
           </div>
 
-          <Button type="button" onClick={handleConfirmPayment} className="mt-6 w-full py-4 rounded-xl">
-            Confirmar pago
+          <Button type="button" onClick={handleConfirmPayment} disabled={isSaving} className="mt-6 w-full py-4 rounded-xl">
+            {isSaving ? "Registrando..." : "Confirmar pago"}
           </Button>
 
           <div className="mt-4 text-sm text-center">

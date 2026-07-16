@@ -50,6 +50,7 @@ export const endpoints = {
   clientNotificationPreferences: buildUrl("/client/notification-preferences"),
   clientNotifications: buildUrl("/client/notifications"),
   clientNotificationPrepare: buildUrl("/client/notifications/prepare"),
+  clientPayments: buildUrl("/client/payments"),
 
   stylistMe: buildUrl("/stylist/me"),
   stylistAvailability: buildUrl("/stylist/availability"),

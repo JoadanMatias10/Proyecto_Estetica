@@ -149,6 +149,12 @@ export function getClientPayments() {
   const records = safeRead(PAYMENTS_KEY, []);
   if (!Array.isArray(records)) return [];
 
+  return normalizeClientPayments(records);
+}
+
+function normalizeClientPayments(records) {
+  if (!Array.isArray(records)) return [];
+
   return records
     .filter((payment) => payment && payment.id)
     .map((payment) => ({
@@ -160,9 +166,25 @@ export function getClientPayments() {
       fecha: payment.fecha || new Date().toISOString().slice(0, 10),
       estatus: payment.estatus || "Pagado",
       detalle: Array.isArray(payment.detalle) ? payment.detalle : [],
+      cliente: payment.cliente || {},
+      referencia: payment.referencia || "",
+      comprobanteUrl: payment.comprobanteUrl || "",
+      notas: payment.notas || "",
       createdAt: payment.createdAt || new Date().toISOString(),
     }))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+export function saveClientPayments(payments) {
+  const normalized = normalizeClientPayments(payments);
+  safeWrite(PAYMENTS_KEY, normalized);
+  return normalized;
+}
+
+export function cacheClientPayment(payment) {
+  if (!payment?.id) return getClientPayments();
+  const payments = getClientPayments().filter((item) => String(item.id) !== String(payment.id));
+  return saveClientPayments([payment, ...payments]);
 }
 
 export function addClientPayment(payment) {

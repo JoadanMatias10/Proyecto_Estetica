@@ -2,11 +2,17 @@ const express = require("express");
 const mongoose = require("mongoose");
 const Appointment = require("../models/Cita");
 const ClientNotification = require("../models/NotificacionCliente");
+const ClientPayment = require("../models/PagoCliente");
+const Product = require("../models/Producto");
 const Service = require("../models/Servicio");
 const StylistAvailability = require("../models/DisponibilidadEstilista");
 const StaffMember = require("../models/MiembroPersonal");
 const User = require("../models/Usuario");
 const { verifyToken } = require("../utils/auth");
+const {
+  buildClientNotificationResponse,
+  deliverClientAppointmentNotification,
+} = require("../utils/clientNotifications");
 const { parseServiceDurationMinutes } = require("../utils/serviceDuration");
 const {
   buildAvailableSlotsForDate,
@@ -40,6 +46,8 @@ const DEFAULT_NOTIFICATION_PREFERENCES = {
   promotions: true,
   appointmentChanges: true,
 };
+const PAYMENT_TYPES = new Set(["Producto", "Servicio"]);
+const PAYMENT_METHODS = new Set(["Tarjeta", "Transferencia", "Pago en sucursal"]);
 
 function buildUserResponse(user) {
   return {
@@ -80,19 +88,6 @@ function buildNotificationPreferencesResponse(user) {
   return {
     ...DEFAULT_NOTIFICATION_PREFERENCES,
     ...(user?.notificationPreferences || {}),
-  };
-}
-
-function buildClientNotificationResponse(notification) {
-  return {
-    id: String(notification._id),
-    appointmentId: notification.appointmentId ? String(notification.appointmentId) : "",
-    canal: notification.canal,
-    anticipacion: notification.anticipacion,
-    mensaje: notification.mensaje,
-    estado: notification.estado,
-    fechaObjetivo: notification.fechaObjetivo,
-    createdAt: notification.createdAt,
   };
 }
 
@@ -169,6 +164,115 @@ function normalizeNotificationPreferencesPayload(payload) {
     promotions: Boolean(payload?.promotions),
     appointmentChanges: Boolean(payload?.appointmentChanges),
   };
+}
+
+function buildClientFullName(user) {
+  return [user?.nombre, user?.apellidoPaterno, user?.apellidoMaterno]
+    .map((value) => normalizeString(value))
+    .filter(Boolean)
+    .join(" ");
+}
+
+function normalizeClientPaymentMethod(value) {
+  const method = normalizeString(value || "Transferencia");
+  if (PAYMENT_METHODS.has(method)) return method;
+  return "";
+}
+
+function getClientPaymentStatus(method) {
+  if (method === "Transferencia" || method === "Pago en sucursal") return "Pendiente";
+  return "Pagado";
+}
+
+function getPaymentItemId(item) {
+  return normalizeString(item?.itemId || item?.productId || item?.serviceId || item?.id || "");
+}
+
+function getPaymentItemQuantity(item) {
+  const quantity = Math.floor(Number(item?.cantidad || item?.quantity || 1));
+  return Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
+}
+
+function buildPaymentConcept(type, items) {
+  if (items.length === 1) return items[0].nombre;
+  const totalItems = items.reduce((sum, item) => sum + Number(item.cantidad || 0), 0);
+  return type === "Producto"
+    ? `Carrito (${totalItems} ${totalItems === 1 ? "producto" : "productos"})`
+    : `${items.length} servicios`;
+}
+
+function buildClientPaymentResponse(payment) {
+  const source = typeof payment?.toObject === "function" ? payment.toObject() : payment;
+  const createdAt = source.createdAt || new Date();
+  return {
+    id: String(source._id),
+    tipo: source.tipo,
+    concepto: source.concepto,
+    total: Number(source.total || 0),
+    metodo: source.metodo,
+    fecha: new Date(createdAt).toISOString().slice(0, 10),
+    estatus: source.estatus,
+    detalle: Array.isArray(source.detalle) ? source.detalle : [],
+    cliente: source.cliente || {},
+    referencia: source.referencia || "",
+    comprobanteUrl: source.comprobanteUrl || "",
+    notas: source.notas || "",
+    createdAt,
+  };
+}
+
+async function normalizeClientPaymentItems(type, rawItems, errors) {
+  const items = Array.isArray(rawItems) ? rawItems : [];
+  if (!items.length) {
+    errors.push("Agrega al menos un producto o servicio al pago.");
+    return [];
+  }
+
+  const itemIds = items.map(getPaymentItemId);
+  if (itemIds.some((id) => !id || !isValidId(id))) {
+    errors.push(type === "Producto" ? "Producto invalido en el pago." : "Servicio invalido en el pago.");
+    return [];
+  }
+
+  const objectIds = itemIds.map((id) => new mongoose.Types.ObjectId(id));
+  const Model = type === "Producto" ? Product : Service;
+  const records = await Model.find({ _id: { $in: objectIds } })
+    .select(type === "Producto" ? "nombre precio stock" : "nombre precio")
+    .lean();
+  const recordsById = new Map(records.map((record) => [String(record._id), record]));
+
+  const normalizedItems = [];
+  for (const rawItem of items) {
+    const id = getPaymentItemId(rawItem);
+    const record = recordsById.get(id);
+    if (!record) {
+      errors.push(type === "Producto" ? "Producto no encontrado." : "Servicio no encontrado.");
+      continue;
+    }
+
+    const quantity = type === "Producto" ? getPaymentItemQuantity(rawItem) : 1;
+    if (!quantity) {
+      errors.push("Cantidad invalida en el pago.");
+      continue;
+    }
+
+    if (type === "Producto" && Number(record.stock || 0) < quantity) {
+      errors.push(`No hay stock suficiente para ${record.nombre}.`);
+      continue;
+    }
+
+    const price = Number(record.precio || 0);
+    const subtotal = price * quantity;
+    normalizedItems.push({
+      itemId: record._id,
+      nombre: record.nombre,
+      cantidad: quantity,
+      precio: price,
+      subtotal,
+    });
+  }
+
+  return normalizedItems;
 }
 
 async function getAppointmentDurationMinutes(appointment) {
@@ -531,19 +635,95 @@ router.post("/notifications/prepare", async (req, res) => {
   }
 
   const user = await User.findById(req.user.id).lean();
-  const settings = buildReminderSettingsResponse(user);
-  const notification = await ClientNotification.create({
-    userId: req.user.id,
-    appointmentId,
-    canal: settings.canal,
-    anticipacion: settings.anticipacion,
-    mensaje: messageText,
-    fechaObjetivo: appointment.fechaHora || null,
+  if (!user) {
+    return res.status(404).json({ errors: ["Cliente no encontrado."] });
+  }
+
+  const preferences = buildNotificationPreferencesResponse(user);
+  if (!preferences.appointmentReminders) {
+    return res.status(400).json({ errors: ["Activa los avisos de cita en tus preferencias de notificacion."] });
+  }
+
+  const result = await deliverClientAppointmentNotification({
+    user,
+    appointment,
+    settings: buildReminderSettingsResponse(user),
+    messageText,
+    origen: "manual",
   });
 
+  const payload = {
+    message: result.message,
+    notification: buildClientNotificationResponse(result.notification),
+  };
+
+  if (!result.ok) {
+    return res.status(result.status).json({ errors: [result.message], ...payload });
+  }
+
+  return res.status(result.status).json(payload);
+});
+
+router.get("/payments", async (req, res) => {
+  const payments = await ClientPayment.find({ userId: req.user.id })
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .lean();
+
+  return res.json({ payments: payments.map(buildClientPaymentResponse) });
+});
+
+router.post("/payments", async (req, res) => {
+  const errors = [];
+  const type = normalizeString(req.body.tipo || "Producto");
+  const method = normalizeClientPaymentMethod(req.body.metodo || req.body.metodoPago);
+
+  if (!PAYMENT_TYPES.has(type)) {
+    errors.push("Tipo de pago invalido.");
+  }
+  if (!method) {
+    errors.push("Metodo de pago invalido.");
+  }
+
+  const user = await User.findById(req.user.id).lean();
+  if (!user) {
+    return res.status(404).json({ errors: ["Cliente no encontrado."] });
+  }
+
+  const items = errors.length ? [] : await normalizeClientPaymentItems(type, req.body.detalle, errors);
+  const total = items.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
+
+  if (total <= 0) {
+    errors.push("El total del pago debe ser mayor a cero.");
+  }
+  if (errors.length) {
+    return res.status(400).json({ errors });
+  }
+
+  const payment = await ClientPayment.create({
+    userId: req.user.id,
+    tipo: type,
+    concepto: buildPaymentConcept(type, items),
+    total,
+    metodo: method,
+    estatus: getClientPaymentStatus(method),
+    detalle: items,
+    cliente: {
+      nombre: buildClientFullName(user),
+      telefono: user.telefono || "",
+      correo: user.correo || "",
+    },
+    referencia: normalizeString(req.body.referencia || "").slice(0, 80),
+    comprobanteUrl: normalizeString(req.body.comprobanteUrl || "").slice(0, 500),
+    notas: normalizeString(req.body.notas || "").slice(0, 300),
+  });
+
+  const isPending = payment.estatus === "Pendiente";
   return res.status(201).json({
-    message: "Notificacion preparada.",
-    notification: buildClientNotificationResponse(notification),
+    message: isPending
+      ? "Pago registrado. Queda pendiente de confirmacion."
+      : "Pago registrado correctamente.",
+    payment: buildClientPaymentResponse(payment),
   });
 });
 

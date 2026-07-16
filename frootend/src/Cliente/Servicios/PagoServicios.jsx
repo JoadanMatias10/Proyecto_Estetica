@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { endpoints, requestJson } from "../../api";
 import Button from "../../components/ui/Button";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
-import { addClientPayment } from "../../utils/clientStore";
+import { cacheClientPayment, getClientToken } from "../../utils/clientStore";
 import { fetchPublicServicesBundle } from "../../utils/publicCatalogApi";
 
 function formatCurrency(value) {
@@ -17,7 +18,9 @@ export default function PagoServicios() {
   const [selectedServiceId, setSelectedServiceId] = useState(serviceIdFromUrl);
   const [paymentMethod, setPaymentMethod] = useState("Tarjeta");
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [paymentError, setPaymentError] = useState("");
 
   useEffect(() => {
     const loadServices = async () => {
@@ -44,24 +47,35 @@ export default function PagoServicios() {
     [selectedServiceId, services]
   );
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
     if (!selectedService) return;
-    addClientPayment({
-      tipo: "Servicio",
-      concepto: selectedService.nombre,
-      total: Number(selectedService.precio || 0),
-      metodo: paymentMethod,
-      estatus: "Pagado",
-      detalle: [
-        {
-          id: selectedService.id,
-          nombre: selectedService.nombre,
-          cantidad: 1,
-          precio: Number(selectedService.precio || 0),
+    setIsSaving(true);
+    setPaymentError("");
+    try {
+      const data = await requestJson(endpoints.clientPayments, {
+        method: "POST",
+        token: getClientToken(),
+        body: {
+          tipo: "Servicio",
+          metodo: paymentMethod,
+          detalle: [
+            {
+              id: selectedService.id,
+              cantidad: 1,
+            },
+          ],
         },
-      ],
-    });
-    navigate("/cliente/pagos");
+      });
+
+      if (data.payment) {
+        cacheClientPayment(data.payment);
+      }
+      navigate("/cliente/pagos");
+    } catch (error) {
+      setPaymentError(error.message || "No fue posible registrar el pago.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (isLoading) {
@@ -79,6 +93,12 @@ export default function PagoServicios() {
         {errorMessage && (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
             {errorMessage}
+          </div>
+        )}
+
+        {paymentError && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+            {paymentError}
           </div>
         )}
 
@@ -128,10 +148,10 @@ export default function PagoServicios() {
         <Button
           type="button"
           onClick={handleConfirmPayment}
-          disabled={!selectedService}
+          disabled={!selectedService || isSaving}
           className="w-full py-4 rounded-xl"
         >
-          Confirmar pago
+          {isSaving ? "Registrando..." : "Confirmar pago"}
         </Button>
 
         <Link to="/cliente/servicios" className="block text-center text-sm font-semibold text-violet-600 hover:text-violet-700">

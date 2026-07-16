@@ -22,6 +22,8 @@ export default function NotificarCitas() {
   const [selectedAppointmentId, setSelectedAppointmentId] = useState("");
   const [messageText, setMessageText] = useState("Hola, te recordamos tu cita en Estetica Panamericana. Te esperamos.");
   const [sentMessage, setSentMessage] = useState("");
+  const [feedbackType, setFeedbackType] = useState("success");
+  const [whatsappUrl, setWhatsappUrl] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -60,6 +62,7 @@ export default function NotificarCitas() {
     }
     setIsSaving(true);
     setSentMessage("");
+    setWhatsappUrl("");
     try {
       const token = getClientToken();
       const data = await requestJson(endpoints.clientNotificationPrepare, {
@@ -70,9 +73,13 @@ export default function NotificarCitas() {
           messageText,
         },
       });
-      setSentMessage(data.message || `Notificacion preparada por ${reminderSettings.canal} para ${formatDateTime(selectedAppointment.fechaHora)}.`);
+      setFeedbackType("success");
+      setWhatsappUrl(data.notification?.whatsappUrl || "");
+      setSentMessage(data.message || `Notificacion enviada por ${reminderSettings.canal} para ${formatDateTime(selectedAppointment.fechaHora)}.`);
     } catch (error) {
-      setSentMessage(error.message || "No fue posible preparar la notificacion.");
+      setFeedbackType("error");
+      setWhatsappUrl(error.payload?.notification?.whatsappUrl || "");
+      setSentMessage(error.message || "No fue posible enviar la notificacion.");
     } finally {
       setIsSaving(false);
     }
@@ -81,13 +88,25 @@ export default function NotificarCitas() {
   return (
     <div className="max-w-3xl">
       <h1 className="page-title">Notificar citas</h1>
-      <p className="page-subtitle mt-2">Prepara el aviso de tu proxima cita.</p>
+      <p className="page-subtitle mt-2">Envia el aviso de tu proxima cita.</p>
 
       <div className="card mt-8 p-8 space-y-6">
         {sentMessage && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <div className={`rounded-xl border px-4 py-3 text-sm ${
+            feedbackType === "error"
+              ? "border-red-200 bg-red-50 text-red-600"
+              : "border-emerald-200 bg-emerald-50 text-emerald-700"
+          }`}>
             {sentMessage}
           </div>
+        )}
+
+        {whatsappUrl && (
+          <a href={whatsappUrl} target="_blank" rel="noreferrer" className="block">
+            <Button type="button" variant="emerald" className="w-full py-3 rounded-xl">
+              Abrir WhatsApp
+            </Button>
+          </a>
         )}
 
         <div>
@@ -125,7 +144,7 @@ export default function NotificarCitas() {
         </div>
 
         <Button type="button" onClick={handleSend} disabled={isSaving} className="w-full py-4 rounded-xl">
-          {isSaving ? "Preparando..." : "Preparar notificacion"}
+          {isSaving ? "Enviando..." : "Enviar notificacion"}
         </Button>
 
         <Link to="/cliente/notificaciones" className="block text-center text-sm font-semibold text-violet-600 hover:text-violet-700">

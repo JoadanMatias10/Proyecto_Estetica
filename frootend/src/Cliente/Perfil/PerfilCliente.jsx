@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { endpoints, requestJson } from "../../api";
 import Button from "../../components/ui/Button";
 import SidebarIcon from "../../components/ui/SidebarIcon";
-import { getClientPayments, getNotificationPreferences, getStoredClientUser } from "../../utils/clientStore";
+import { getClientPayments, getClientToken, getNotificationPreferences, getStoredClientUser, saveClientPayments } from "../../utils/clientStore";
 
 export default function PerfilCliente() {
   const [user, setUser] = useState(() => getStoredClientUser());
@@ -15,6 +16,16 @@ export default function PerfilCliente() {
       setUser(getStoredClientUser());
       setPayments(getClientPayments());
     };
+    const loadPayments = async () => {
+      try {
+        const data = await requestJson(endpoints.clientPayments, { token: getClientToken() });
+        setPayments(saveClientPayments(Array.isArray(data.payments) ? data.payments : []));
+      } catch (_error) {
+        setPayments(getClientPayments());
+      }
+    };
+
+    loadPayments();
     window.addEventListener("client-state-change", refresh);
     window.addEventListener("storage", refresh);
     return () => {

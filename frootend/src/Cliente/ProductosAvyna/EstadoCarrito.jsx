@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { endpoints, requestJson } from "../../api";
 import Button from "../../components/ui/Button";
-import { getCartSummary, getClientCart, getClientPayments } from "../../utils/clientStore";
+import { getCartSummary, getClientCart, getClientPayments, getClientToken, saveClientPayments } from "../../utils/clientStore";
 
 function getStatusClass(status) {
   if (status === "Completado") return "bg-emerald-100 text-emerald-700 border-emerald-200";
@@ -11,10 +12,24 @@ function getStatusClass(status) {
 
 export default function EstadoCarrito() {
   const cart = getClientCart();
-  const payments = getClientPayments().filter((payment) => payment.tipo === "Producto");
+  const [payments, setPayments] = useState(() => getClientPayments().filter((payment) => payment.tipo === "Producto"));
   const summary = getCartSummary(cart);
   const hasCart = cart.length > 0;
   const hasProductPayment = payments.length > 0;
+
+  useEffect(() => {
+    const loadPayments = async () => {
+      try {
+        const data = await requestJson(endpoints.clientPayments, { token: getClientToken() });
+        const nextPayments = saveClientPayments(Array.isArray(data.payments) ? data.payments : []);
+        setPayments(nextPayments.filter((payment) => payment.tipo === "Producto"));
+      } catch (_error) {
+        setPayments(getClientPayments().filter((payment) => payment.tipo === "Producto"));
+      }
+    };
+
+    loadPayments();
+  }, []);
 
   const steps = [
     { step: "Productos seleccionados", status: hasCart || hasProductPayment ? "Completado" : "Pendiente" },
