@@ -51,6 +51,7 @@ export const endpoints = {
   clientNotifications: buildUrl("/client/notifications"),
   clientNotificationPrepare: buildUrl("/client/notifications/prepare"),
   clientPayments: buildUrl("/client/payments"),
+  clientPaymentConfig: buildUrl("/client/payment-config"),
 
   stylistMe: buildUrl("/stylist/me"),
   stylistAvailability: buildUrl("/stylist/availability"),
@@ -82,7 +83,18 @@ export const endpoints = {
   adminPromotionById: (id) => buildUrl(`/admin/promotions/${id}`),
   adminSales: ({ desde = "", hasta = "" } = {}) =>
     buildUrl(`/admin/sales?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`),
+  adminClientPayments: ({ estatus = "Todos", tipo = "Todos", metodo = "Todos" } = {}) =>
+    buildUrl(`/admin/client-payments?estatus=${encodeURIComponent(estatus)}&tipo=${encodeURIComponent(tipo)}&metodo=${encodeURIComponent(metodo)}`),
+  adminClientPaymentStatus: (id) =>
+    buildUrl(`/admin/client-payments/${encodeURIComponent(id || "")}/status`),
   adminSalesPredictive: (date) => buildUrl(date ? `/admin/sales/predictive?date=${encodeURIComponent(date)}` : "/admin/sales/predictive"),
+  adminSalesRegressionDataset: buildUrl("/admin/sales/regression-dataset"),
+  adminSalesRegressionPredict: buildUrl("/admin/sales/regression-predict"),
+  adminServicesClusteringDataset: buildUrl("/admin/services/clustering-dataset"),
+  adminServicesClusteringRecommend: buildUrl("/admin/services/clustering-recommend"),
+  adminAppointmentsClassificationDataset: ({ desde = "", hasta = "", limit = 1000 } = {}) =>
+    buildUrl(`/admin/appointments/classification-dataset?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&limit=${encodeURIComponent(limit)}`),
+  adminAppointmentsClassificationPredict: buildUrl("/admin/appointments/classification-predict"),
   adminSaleCancel: (id) => buildUrl(`/admin/sales/${encodeURIComponent(id)}/cancel`),
   adminInventoryMovements: ({ action = "Todos" } = {}) =>
     buildUrl(`/admin/inventory/movements?action=${encodeURIComponent(action)}`),

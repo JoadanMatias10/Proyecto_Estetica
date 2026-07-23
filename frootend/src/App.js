@@ -106,10 +106,14 @@ import CategoriasProductos from "./Administrador/Productos/CategoriasProductos";
 import MarcasProductos from "./Administrador/Productos/MarcasProductos";
 import RegistrarVenta from "./Administrador/Ventas/RegistrarVenta";
 import HistorialVentas from "./Administrador/Ventas/HistorialVentas";
+import PagosTransferencia from "./Administrador/Pagos/PagosTransferencia";
 import GestionPersonal from "./Administrador/Personal/GestionPersonal";
 import GenerarReportes from "./Administrador/Reportes/GenerarReportes";
 import InformesEstadisticos from "./Administrador/Reportes/InformesEstadisticos";
 import ModeloPredictivo from "./Administrador/Reportes/ModeloPredictivo";
+import ClasificacionCitas from "./Administrador/Reportes/ClasificacionCitas";
+import RegresionDemanda from "./Administrador/Reportes/RegresionDemanda";
+import RecomendacionServicios from "./Administrador/Reportes/RecomendacionServicios";
 import InformacionEmpresa from "./Administrador/Empresa/InformacionEmpresa";
 import ControlStock from "./Administrador/Inventario/ControlStock";
 import CategoriasServicios from "./Administrador/Servicios/CategoriasServicios";
@@ -200,10 +204,14 @@ export default function App() {
         <Route path="destacados-inicio" element={<GestionDestacadosInicio />} />
         <Route path="ventas" element={<HistorialVentas />} />
         <Route path="ventas/nueva" element={<RegistrarVenta />} />
+        <Route path="pagos-transferencia" element={<PagosTransferencia />} />
         <Route path="personal" element={<GestionPersonal />} />
         <Route path="reportes/generar" element={<GenerarReportes />} />
         <Route path="reportes/estadisticas" element={<InformesEstadisticos />} />
         <Route path="reportes/predictivo" element={<ModeloPredictivo />} />
+        <Route path="reportes/clasificacion-citas" element={<ClasificacionCitas />} />
+        <Route path="reportes/regresion-demanda" element={<RegresionDemanda />} />
+        <Route path="reportes/recomendacion-servicios" element={<RecomendacionServicios />} />
         <Route path="empresa" element={<InformacionEmpresa />} />
         <Route path="carrusel" element={<GestionCarrusel />} />
         <Route path="marketing/carrusel" element={<GestionCarrusel />} />

@@ -37,6 +37,7 @@ const routeNameMap = {
   marcas: "Marcas",
   carrusel: "Carrusel",
   "destacados-inicio": "Destacados Inicio",
+  "pagos-transferencia": "Pagos de Clientes",
   respaldos: "Respaldos BD",
 };
 
@@ -44,6 +45,10 @@ const customBreadcrumbs = {
   "/admin/reportes/estadisticas": [
     { to: "/admin", label: "Administrador" },
     { to: "/admin/reportes/estadisticas", label: "Estadisticas" },
+  ],
+  "/admin/reportes/clasificacion-citas": [
+    { to: "/admin", label: "Administrador" },
+    { to: "/admin/reportes/clasificacion-citas", label: "Clasificacion Citas" },
   ],
 };
 
@@ -67,8 +72,8 @@ export default function Breadcrumbs() {
     }));
 
   return (
-    <nav className="text-sm font-medium text-rose-500 mb-4" aria-label="Breadcrumb">
-      <ol className="list-none p-0 inline-flex">
+    <nav className="-mx-1 mb-4 overflow-x-auto px-1 pb-1 text-sm font-medium text-rose-500" aria-label="Breadcrumb">
+      <ol className="inline-flex min-w-max list-none p-0">
         <li className="flex items-center">
           <Link to={homePath} className="hover:text-rose-700 transition-colors">
             Inicio

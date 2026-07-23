@@ -230,7 +230,7 @@ export default function GestionPersonal() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Gestion de Personal</h1>
           <p className="text-slate-500 text-sm">Administra personal interno, cuentas y activaciones.</p>
@@ -269,7 +269,7 @@ export default function GestionPersonal() {
           <LoadingSpinner fullScreen={false} text="Cargando personal..." className="py-14" />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-600">
+            <table className="min-w-[920px] w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 text-slate-800 font-semibold uppercase text-xs">
                 <tr>
                   <th className="px-6 py-4">Nombre</th>
@@ -383,7 +383,7 @@ export default function GestionPersonal() {
               placeholder="Nombre"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="form-label">Rol</label>
               <select name="rol" value={formValues.rol} onChange={handleInputChange} className="form-input">
@@ -402,7 +402,7 @@ export default function GestionPersonal() {
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="form-label">Email</label>
               <input

@@ -11,6 +11,11 @@ import {
   getClientToken,
 } from "../../utils/clientStore";
 import { formatProductPresentation } from "../../utils/productPresentation";
+import TransferenciaFields, {
+  buildClientPaymentBody,
+  validateTransferPayment,
+} from "../Pagos/TransferenciaFields";
+import OnlinePaymentButtons from "../Pagos/OnlinePaymentButtons";
 
 function formatCurrency(value) {
   return `$${Number(value || 0).toFixed(2)} MXN`;
@@ -24,6 +29,8 @@ export default function PagoProducto({ mode = "product" }) {
   const [cart, setCart] = useState(() => getClientCart());
   const [quantity, setQuantity] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState("Tarjeta");
+  const [transferReference, setTransferReference] = useState("");
+  const [transferProof, setTransferProof] = useState(null);
   const [isLoading, setIsLoading] = useState(!isCartPayment);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -82,17 +89,27 @@ export default function PagoProducto({ mode = "product" }) {
   const handleConfirmPayment = async () => {
     if (summary.subtotal <= 0 || detail.length === 0) return;
 
+    if (paymentMethod === "Transferencia") {
+      const validationError = validateTransferPayment(transferReference, transferProof);
+      if (validationError) {
+        setPaymentError(validationError);
+        return;
+      }
+    }
+
     setIsSaving(true);
     setPaymentError("");
     try {
       const data = await requestJson(endpoints.clientPayments, {
         method: "POST",
         token: getClientToken(),
-        body: {
+        body: buildClientPaymentBody({
           tipo: "Producto",
           metodo: paymentMethod,
           detalle: detail,
-        },
+          referencia: transferReference,
+          comprobante: transferProof,
+        }),
       });
 
       if (data.payment) {
@@ -112,13 +129,19 @@ export default function PagoProducto({ mode = "product" }) {
     }
   };
 
+  const handleOnlinePayment = (provider) => {
+    setPaymentError(
+      `${provider} necesita las credenciales de una cuenta comercial para procesar el pago.`
+    );
+  };
+
   if (isLoading) {
     return <LoadingSpinner text="Preparando pago..." fullScreen={false} className="py-24" />;
   }
 
   if (errorMessage || (!isCartPayment && !product)) {
     return (
-      <div className="card max-w-2xl p-8 text-center">
+      <div className="card max-w-2xl p-4 text-center sm:p-8">
         <h1 className="text-2xl font-bold text-slate-800">No se pudo preparar el pago</h1>
         <p className="mt-3 text-slate-500">{errorMessage || "Producto no encontrado."}</p>
         <Link to="/cliente/productos" className="mt-6 inline-block">
@@ -130,7 +153,7 @@ export default function PagoProducto({ mode = "product" }) {
 
   if (isCartPayment && cart.length === 0) {
     return (
-      <div className="card max-w-2xl p-8 text-center">
+      <div className="card max-w-2xl p-4 text-center sm:p-8">
         <h1 className="text-2xl font-bold text-slate-800">Tu carrito esta vacio</h1>
         <p className="mt-3 text-slate-500">Agrega productos antes de continuar con el pago.</p>
         <Link to="/cliente/productos" className="mt-6 inline-block">
@@ -216,6 +239,17 @@ export default function PagoProducto({ mode = "product" }) {
               <option>Pago en sucursal</option>
             </select>
           </div>
+
+          <OnlinePaymentButtons onSelect={handleOnlinePayment} />
+
+          {paymentMethod === "Transferencia" && (
+            <TransferenciaFields
+              reference={transferReference}
+              onReferenceChange={setTransferReference}
+              proofFile={transferProof}
+              onProofFileChange={setTransferProof}
+            />
+          )}
         </div>
 
         <aside className="card h-fit p-6">
@@ -232,7 +266,11 @@ export default function PagoProducto({ mode = "product" }) {
           </div>
 
           <Button type="button" onClick={handleConfirmPayment} disabled={isSaving} className="mt-6 w-full py-4 rounded-xl">
-            {isSaving ? "Registrando..." : "Confirmar pago"}
+            {isSaving
+              ? "Registrando..."
+              : paymentMethod === "Transferencia"
+                ? "Registrar transferencia"
+                : "Confirmar pago"}
           </Button>
 
           <div className="mt-4 text-sm text-center">

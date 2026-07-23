@@ -395,12 +395,12 @@ export default function ControlStock() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Control de Inventario</h1>
           <p className="text-slate-500 text-sm">Monitorea el stock y revisa el historial de movimientos.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={handleDownloadReport}
@@ -446,9 +446,9 @@ export default function ControlStock() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="font-bold text-slate-800">Historial de Movimientos</h3>
-          <select className="text-sm border-slate-300 rounded-lg" onChange={(e) => setFilter(e.target.value)} value={filter}>
+          <select className="w-full rounded-lg border-slate-300 text-sm sm:w-auto" onChange={(e) => setFilter(e.target.value)} value={filter}>
             <option>Todos</option>
             <option>Entrada</option>
             <option>Salida</option>

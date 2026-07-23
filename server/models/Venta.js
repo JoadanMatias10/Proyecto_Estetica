@@ -13,6 +13,7 @@ const saleItemSchema = new mongoose.Schema(
 
 const saleSchema = new mongoose.Schema(
   {
+    clientPaymentId: { type: mongoose.Schema.Types.ObjectId, ref: "ClientPayment", default: null, index: true },
     cliente: { type: String, default: "", trim: true },
     usuario: { type: String, required: true, trim: true },
     metodoPago: { type: String, required: true, enum: ["Efectivo", "Tarjeta", "Transferencia"], default: "Efectivo" },

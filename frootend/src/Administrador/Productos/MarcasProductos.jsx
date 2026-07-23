@@ -114,7 +114,7 @@ export default function MarcasProductos() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Marcas de Productos</h1>
           <p className="text-slate-500 text-sm">Registra nuevas marcas para que aparezcan en catalogo de productos.</p>
@@ -135,7 +135,7 @@ export default function MarcasProductos() {
           <LoadingSpinner fullScreen={false} text="Cargando marcas..." className="py-14" />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-600">
+            <table className="min-w-[700px] w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 text-slate-800 font-semibold uppercase text-xs">
                 <tr>
                   <th className="px-6 py-4">Marca</th>

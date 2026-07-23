@@ -25,8 +25,20 @@ const clientPaymentSchema = new mongoose.Schema(
     },
     estatus: {
       type: String,
-      enum: ["Pendiente", "Pagado", "Confirmado", "Rechazado"],
+      enum: ["Pendiente", "Procesando", "Pagado", "Confirmado", "Rechazado"],
       default: "Pendiente",
+      index: true,
+    },
+    appointmentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Appointment",
+      default: null,
+      index: true,
+    },
+    saleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Sale",
+      default: null,
       index: true,
     },
     detalle: {
@@ -41,7 +53,12 @@ const clientPaymentSchema = new mongoose.Schema(
     },
     referencia: { type: String, default: "", trim: true },
     comprobanteUrl: { type: String, default: "", trim: true },
+    comprobantePublicId: { type: String, default: "", trim: true },
+    comprobanteNombre: { type: String, default: "", trim: true },
     notas: { type: String, default: "", trim: true, maxlength: 300 },
+    notasAdmin: { type: String, default: "", trim: true, maxlength: 300 },
+    revisadoAt: { type: Date, default: null },
+    revisadoPor: { type: String, default: "", trim: true },
   },
   { timestamps: true, collection: "pagos_cliente" }
 );

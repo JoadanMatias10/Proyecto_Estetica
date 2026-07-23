@@ -65,7 +65,7 @@ export default function DetalleServicio() {
 
   if (!service || errorType === "not_found") {
     return (
-      <div className="card min-h-[50vh] p-8 text-center flex flex-col items-center justify-center">
+      <div className="card min-h-[50vh] p-4 text-center flex flex-col items-center justify-center sm:p-8">
         <h1 className="mb-4 text-2xl font-bold text-slate-800">Servicio no encontrado</h1>
         <Link to="/servicios" className="font-medium text-violet-600 underline hover:text-violet-700">
           Volver al catalogo

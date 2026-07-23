@@ -244,7 +244,7 @@ export default function InformacionEmpresa() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Informacion de la Empresa</h1>
           <p className="text-slate-500 text-sm">Gestiona la informacion publica de la estetica.</p>
@@ -262,7 +262,7 @@ export default function InformacionEmpresa() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+      <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>

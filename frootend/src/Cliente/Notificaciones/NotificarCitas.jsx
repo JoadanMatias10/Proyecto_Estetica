@@ -90,7 +90,7 @@ export default function NotificarCitas() {
       <h1 className="page-title">Notificar citas</h1>
       <p className="page-subtitle mt-2">Envia el aviso de tu proxima cita.</p>
 
-      <div className="card mt-8 p-8 space-y-6">
+      <div className="card mt-8 space-y-6 p-4 sm:p-8">
         {sentMessage && (
           <div className={`rounded-xl border px-4 py-3 text-sm ${
             feedbackType === "error"

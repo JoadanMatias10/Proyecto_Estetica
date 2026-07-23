@@ -137,7 +137,7 @@ export default function ConfigurarAccesoCuenta({ mode = "reset" }) {
 
   return (
     <div className="max-w-md mx-auto px-4 py-12">
-      <div className="card rounded-3xl p-8 shadow-xl">
+      <div className="card rounded-3xl p-4 shadow-xl sm:p-8">
         <h1 className="page-title">{config.title}</h1>
         <p className="page-subtitle mt-2">{config.subtitle}</p>
 

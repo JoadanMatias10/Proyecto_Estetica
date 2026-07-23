@@ -63,7 +63,7 @@ export default function NotificacionesCliente() {
       <h1 className="page-title">Notificaciones</h1>
       <p className="page-subtitle mt-2">Preferencias y alertas internas.</p>
 
-      <div className="card mt-8 p-8 space-y-4">
+      <div className="card mt-8 space-y-4 p-4 sm:p-8">
         {message && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
             {message}

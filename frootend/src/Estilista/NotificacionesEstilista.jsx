@@ -166,7 +166,7 @@ export default function NotificacionesEstilista() {
             </div>
 
             {proximas.length === 0 ? (
-              <div className="card p-8 text-center">
+              <div className="card p-4 text-center sm:p-8">
                 <SidebarIcon name="appointments" className="h-10 w-10 mx-auto text-slate-300 mb-3" />
                 <p className="text-slate-500">No tienes citas próximas para hoy ni mañana.</p>
               </div>

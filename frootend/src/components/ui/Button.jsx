@@ -2,7 +2,7 @@ import React from "react";
 
 export default function Button({ variant = "default", className = "", children, ...props }) {
   const base =
-    "inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-300 focus:outline-none focus:ring-4 disabled:opacity-60 disabled:cursor-not-allowed";
+    "inline-flex min-w-0 max-w-full items-center justify-center rounded-xl text-center font-semibold transition-all duration-300 focus:outline-none focus:ring-4 disabled:opacity-60 disabled:cursor-not-allowed";
 
   const variants = {
     default: "bg-gradient-to-r from-rose-400 to-violet-500 hover:from-rose-500 hover:to-violet-600 text-white shadow-md hover:shadow-glow focus:ring-violet-300/50 transform hover:scale-105 hover:-translate-y-0.5",

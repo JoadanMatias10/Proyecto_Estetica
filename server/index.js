@@ -8,6 +8,7 @@ const clientRoutes = require("./routes/cliente");
 const stylistRoutes = require("./routes/estilista");
 const adminRoutes = require("./routes/administrador");
 const alexaRoutes = require("./routes/alexa");
+const { startClientNotificationScheduler } = require("./utils/clientNotifications");
 const { ensureCatalogData } = require("./utils/sembrarDatosCatalogo");
 
 const app = express();
@@ -61,6 +62,7 @@ async function start() {
     dbName: process.env.MONGODB_DB_NAME || "Estetica_Panamericana",
   });
   await ensureCatalogData();
+  startClientNotificationScheduler();
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Servidor escuchando en el puerto ${PORT}`);
   });

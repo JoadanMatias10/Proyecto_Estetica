@@ -2,6 +2,7 @@ const Appointment = require("../models/Cita");
 const ClientNotification = require("../models/NotificacionCliente");
 const User = require("../models/Usuario");
 const { isBrevoConfigured, sendTransactionalEmail } = require("./brevo");
+const { buildWhatsAppUrl, normalizeWhatsAppNumber } = require("./whatsapp");
 
 const ACTIVE_APPOINTMENT_STATUSES = ["pendiente", "programada", "confirmada"];
 const NOTIFICATION_CHANNELS = new Set(["Email", "WhatsApp", "Notificacion interna"]);
@@ -14,6 +15,7 @@ const DEFAULT_REMINDER_SETTINGS = {
   anticipacion: "24 horas antes",
   canal: "Email",
 };
+const PREPARED_RETRY_DELAY_MS = 10 * 60 * 1000;
 
 let schedulerTimer = null;
 let schedulerRunning = false;
@@ -58,28 +60,11 @@ function formatDateTime(value) {
     return new Intl.DateTimeFormat("es-MX", {
       dateStyle: "full",
       timeStyle: "short",
+      timeZone: "America/Mexico_City",
     }).format(new Date(value));
   } catch (_error) {
     return new Date(value).toISOString();
   }
-}
-
-function normalizeWhatsAppNumber(value) {
-  const digits = String(value || "").replace(/\D/g, "");
-  if (!digits) return "";
-
-  const countryCode = String(process.env.WHATSAPP_COUNTRY_CODE || "52").replace(/\D/g, "") || "52";
-  if (digits.length === 10) return `${countryCode}${digits}`;
-  if (digits.startsWith(countryCode) && digits.length >= 12 && digits.length <= 15) return digits;
-  if (digits.length >= 11 && digits.length <= 15) return digits;
-
-  return "";
-}
-
-function buildWhatsAppUrl(phone, message) {
-  const normalizedPhone = normalizeWhatsAppNumber(phone);
-  if (!normalizedPhone) return "";
-  return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`;
 }
 
 function buildAppointmentMessage(appointment, customMessage = "") {
@@ -136,11 +121,12 @@ async function deliverClientAppointmentNotification({
   settings,
   messageText,
   origen = "manual",
+  existingNotification = null,
 }) {
   const reminderSettings = buildReminderSettings({ reminderSettings: settings });
   const canal = reminderSettings.canal;
   const message = buildAppointmentMessage(appointment, messageText);
-  const notification = await ClientNotification.create({
+  const notificationData = {
     userId: user._id,
     appointmentId: appointment?._id || null,
     tipo: "recordatorio_cita",
@@ -150,7 +136,14 @@ async function deliverClientAppointmentNotification({
     estado: "preparada",
     origen,
     fechaObjetivo: appointment?.fechaHora || null,
-  });
+    destinatario: "",
+    whatsappUrl: "",
+    enviadoAt: null,
+    errorEnvio: "",
+  };
+  const notification = existingNotification || new ClientNotification();
+  notification.set(notificationData);
+  await notification.save();
 
   if (canal === "WhatsApp") {
     const whatsappUrl = buildWhatsAppUrl(user.telefono, message);
@@ -270,26 +263,56 @@ async function processDueAppointmentReminders() {
       .lean();
 
     for (const appointment of appointments) {
-      const existing = await ClientNotification.findOne({
+      const notificationIdentity = {
         userId: user._id,
         appointmentId: appointment._id,
         tipo: "recordatorio_cita",
         canal: settings.canal,
         anticipacion: settings.anticipacion,
         origen: "automatico",
+      };
+      const delivered = await ClientNotification.findOne({
+        ...notificationIdentity,
+        estado: { $in: ["enviada", "lista_whatsapp"] },
       })
         .select("_id")
         .lean();
 
-      if (existing) continue;
+      if (delivered) continue;
+
+      const retryable = await ClientNotification.findOne({
+        ...notificationIdentity,
+        estado: { $in: ["fallida", "preparada"] },
+      }).sort({ updatedAt: -1 });
+      const preparedRecently =
+        retryable?.estado === "preparada" &&
+        Date.now() - new Date(retryable.updatedAt || retryable.createdAt).getTime() <
+          PREPARED_RETRY_DELAY_MS;
+
+      if (preparedRecently) continue;
 
       await deliverClientAppointmentNotification({
         user,
         appointment,
         settings,
         origen: "automatico",
+        existingNotification: retryable,
       });
     }
+  }
+}
+
+async function triggerDueAppointmentReminderScan() {
+  if (schedulerRunning) return false;
+  schedulerRunning = true;
+  try {
+    await processDueAppointmentReminders();
+    return true;
+  } catch (error) {
+    console.error("Error procesando recordatorios de cliente:", error);
+    return false;
+  } finally {
+    schedulerRunning = false;
   }
 }
 
@@ -303,23 +326,11 @@ function startClientNotificationScheduler() {
     ? configuredInterval
     : 5 * 60 * 1000;
 
-  const run = async () => {
-    if (schedulerRunning) return;
-    schedulerRunning = true;
-    try {
-      await processDueAppointmentReminders();
-    } catch (error) {
-      console.error("Error procesando recordatorios de cliente:", error);
-    } finally {
-      schedulerRunning = false;
-    }
-  };
-
-  schedulerTimer = setInterval(run, intervalMs);
+  schedulerTimer = setInterval(triggerDueAppointmentReminderScan, intervalMs);
   if (typeof schedulerTimer.unref === "function") {
     schedulerTimer.unref();
   }
-  run();
+  void triggerDueAppointmentReminderScan();
   return schedulerTimer;
 }
 
@@ -329,4 +340,5 @@ module.exports = {
   deliverClientAppointmentNotification,
   processDueAppointmentReminders,
   startClientNotificationScheduler,
+  triggerDueAppointmentReminderScan,
 };

@@ -5,10 +5,12 @@ import EstilistaSidebar from "./EstilistaSidebar";
 import Breadcrumbs from "../ui/Breadcrumbs";
 import LoadingSpinner from "../ui/LoadingSpinner";
 import { endpoints } from "../../api";
+import useResponsiveSidebar from "./useResponsiveSidebar";
 
 export default function EstilistaLayout() {
   const navigate = useNavigate();
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const sidebar = useResponsiveSidebar();
 
   useEffect(() => {
     const verifyEstilistaSession = async () => {
@@ -73,10 +75,10 @@ export default function EstilistaLayout() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-rose-50/50 to-violet-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 dark:text-white transition-colors duration-300">
-      <EstilistaHeader />
-      <EstilistaSidebar />
-      <div className="max-w-7xl mx-auto w-full p-4">
-        <main className="min-h-[calc(100vh-5rem)] md:pl-24 transition-all duration-300">
+      <EstilistaHeader isMenuOpen={sidebar.isOpen} onMenuToggle={sidebar.toggle} />
+      <EstilistaSidebar isOpen={sidebar.isOpen} onClose={sidebar.close} />
+      <div className="mx-auto w-full max-w-7xl px-3 py-4 sm:p-4">
+        <main className="min-w-0 min-h-[calc(100vh-4rem)] transition-all duration-300 sm:min-h-[calc(100vh-5rem)] md:pl-24">
           <Breadcrumbs />
           <Outlet />
         </main>

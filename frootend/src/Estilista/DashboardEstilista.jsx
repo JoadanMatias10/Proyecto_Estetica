@@ -180,7 +180,7 @@ export default function DashboardEstilista() {
             </Link>
           </div>
           <div className="table-container">
-            <table className="min-w-full divide-y divide-slate-100">
+            <table className="min-w-[640px] w-full divide-y divide-slate-100">
               <thead className="table-header">
                 <tr>
                   <th className="table-cell">Cliente</th>
@@ -214,7 +214,7 @@ export default function DashboardEstilista() {
             </Link>
           </div>
           <div className="table-container">
-            <table className="min-w-full divide-y divide-slate-100">
+            <table className="min-w-[640px] w-full divide-y divide-slate-100">
               <thead className="table-header">
                 <tr>
                   <th className="table-cell">Cliente</th>

@@ -87,7 +87,7 @@ export default function CalendarioDisponibilidad() {
   const days = [];
 
   for (let index = 0; index < firstDay; index += 1) {
-    days.push(<div key={`empty-${index}`} className="min-h-24 rounded-xl bg-slate-50/50" />);
+    days.push(<div key={`empty-${index}`} className="min-h-12 rounded-md bg-slate-50/50 sm:min-h-24 sm:rounded-xl" />);
   }
 
   for (let day = 1; day <= daysInMonth; day += 1) {
@@ -104,7 +104,8 @@ export default function CalendarioDisponibilidad() {
         type="button"
         key={dayKey}
         onClick={() => setSelectedDay(dayKey)}
-        className={`min-h-24 rounded-xl border-2 p-2 flex flex-col justify-between text-left transition-all duration-300 shadow-sm
+        aria-label={`${day}: ${status}`}
+        className={`flex min-h-12 min-w-0 flex-col justify-between rounded-md border p-1 text-left shadow-sm transition-all duration-300 sm:min-h-24 sm:rounded-xl sm:border-2 sm:p-2
           ${isSelected ? "ring-4 ring-violet-200" : ""}
           ${isPast
             ? "bg-slate-50 border-slate-200 text-slate-400"
@@ -113,11 +114,11 @@ export default function CalendarioDisponibilidad() {
               : "bg-rose-50 border-rose-200 hover:border-rose-300"
           }`}
       >
-        <span className={`font-bold text-lg ${isPast ? "text-slate-400" : isAvailable ? "text-emerald-700" : "text-rose-700"}`}>
+        <span className={`text-sm font-bold sm:text-lg ${isPast ? "text-slate-400" : isAvailable ? "text-emerald-700" : "text-rose-700"}`}>
           {day}
         </span>
         <div className="space-y-1">
-          <span className={`inline-block text-xs font-bold px-2 py-1 rounded-lg ${isPast
+          <span className={`hidden rounded-lg px-2 py-1 text-xs font-bold sm:inline-block ${isPast
             ? "bg-slate-100 text-slate-500"
             : isAvailable
               ? "bg-emerald-100 text-emerald-700"
@@ -125,8 +126,14 @@ export default function CalendarioDisponibilidad() {
             }`}>
             {status}
           </span>
+          <span
+            className={`mx-auto block h-2 w-2 rounded-full sm:hidden ${
+              isPast ? "bg-slate-300" : isAvailable ? "bg-emerald-500" : "bg-rose-400"
+            }`}
+            aria-hidden="true"
+          />
           {isAvailable && (
-            <div className="text-[11px] font-semibold text-emerald-700">
+            <div className="hidden text-[11px] font-semibold text-emerald-700 md:block">
               {availability.slots.length} horarios
             </div>
           )}
@@ -148,15 +155,15 @@ export default function CalendarioDisponibilidad() {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="page-title">Calendario de disponibilidad</h1>
           <p className="page-subtitle mt-1">Consulta dias y horarios libres por estilista.</p>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center md:w-auto">
           <select
-            className="form-input min-w-56"
+            className="form-input w-full sm:min-w-56 md:w-auto"
             value={selectedStylistId}
             onChange={(event) => {
               setSelectedStylistId(event.target.value);
@@ -175,9 +182,9 @@ export default function CalendarioDisponibilidad() {
             )}
           </select>
 
-          <div className="flex items-center gap-4 bg-white p-2 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm sm:w-auto sm:gap-4">
             <button onClick={() => changeMonth(-1)} className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-violet-50 text-violet-600 transition-colors">{"<"}</button>
-            <span className="font-bold text-slate-800 w-36 text-center text-lg">{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}</span>
+            <span className="min-w-0 flex-1 text-center text-base font-bold text-slate-800 sm:w-36 sm:flex-none sm:text-lg">{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}</span>
             <button onClick={() => changeMonth(1)} className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-violet-50 text-violet-600 transition-colors">{">"}</button>
           </div>
         </div>
@@ -192,13 +199,13 @@ export default function CalendarioDisponibilidad() {
       {availabilityLoading ? (
         <LoadingSpinner text="Cargando disponibilidad..." fullScreen={false} className="py-16" />
       ) : (
-        <div className="card rounded-3xl p-4 shadow-xl md:p-6">
-          <div className="grid grid-cols-7 gap-2 mb-4 text-center md:gap-4">
+        <div className="card p-2 shadow-xl sm:p-4 md:p-6">
+          <div className="mb-2 grid grid-cols-7 gap-1 text-center sm:mb-4 sm:gap-2 md:gap-4">
             {["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"].map((day) => (
               <div key={day} className="font-bold text-violet-400 text-xs uppercase tracking-wider md:text-sm">{day}</div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-2 md:gap-4">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2 md:gap-4">
             {days}
           </div>
         </div>

@@ -153,7 +153,7 @@ export default function ReprogramarCita() {
         <p className="page-subtitle mt-2">Selecciona una cita y define nueva fecha y hora.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="card mt-8 p-8 space-y-6">
+      <form onSubmit={handleSubmit} className="card mt-8 space-y-6 p-4 sm:p-8">
         {(message || errorMessage) && (
           <div className={`rounded-xl border px-4 py-3 text-sm ${message ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-600"}`}>
             {message || errorMessage}

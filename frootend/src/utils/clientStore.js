@@ -165,11 +165,16 @@ function normalizeClientPayments(records) {
       metodo: payment.metodo || "Tarjeta",
       fecha: payment.fecha || new Date().toISOString().slice(0, 10),
       estatus: payment.estatus || "Pagado",
+      appointmentId: payment.appointmentId || "",
+      saleId: payment.saleId || "",
       detalle: Array.isArray(payment.detalle) ? payment.detalle : [],
       cliente: payment.cliente || {},
       referencia: payment.referencia || "",
       comprobanteUrl: payment.comprobanteUrl || "",
       notas: payment.notas || "",
+      notasAdmin: payment.notasAdmin || "",
+      revisadoAt: payment.revisadoAt || null,
+      revisadoPor: payment.revisadoPor || "",
       createdAt: payment.createdAt || new Date().toISOString(),
     }))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));

@@ -79,7 +79,7 @@ export default function Registro() {
 
   return (
     <div className="max-w-lg mx-auto px-4 py-12">
-      <div className="card rounded-3xl p-8 shadow-xl">
+      <div className="card rounded-3xl p-4 shadow-xl sm:p-8">
         <h1 className="page-title">Registro</h1>
         <p className="page-subtitle mt-2">Crea tu cuenta para agendar y comprar.</p>
 

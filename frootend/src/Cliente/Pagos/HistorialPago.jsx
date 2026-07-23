@@ -94,6 +94,38 @@ export default function HistorialPago() {
                       Cliente: {payment.cliente.nombre || "Cliente"} - {payment.cliente.telefono}
                     </div>
                   )}
+                  {payment.metodo === "Transferencia" && (
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+                      <span className="font-semibold text-slate-600">
+                        Referencia: <span className="font-mono text-slate-800">{payment.referencia || "-"}</span>
+                      </span>
+                      {payment.comprobanteUrl && (
+                        <a
+                          href={payment.comprobanteUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-bold text-violet-600 hover:text-violet-800"
+                        >
+                          Ver comprobante
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  {payment.notasAdmin && (
+                    <div className="mt-2 border-l-2 border-slate-300 pl-3 text-xs text-slate-600">
+                      Revision: {payment.notasAdmin}
+                    </div>
+                  )}
+                  {payment.saleId && (
+                    <div className="mt-2 text-xs font-semibold text-emerald-700">
+                      Venta registrada: <span className="font-mono">{payment.saleId}</span>
+                    </div>
+                  )}
+                  {payment.appointmentId && (
+                    <div className="mt-2 text-xs font-semibold text-violet-700">
+                      Cita vinculada: <span className="font-mono">{payment.appointmentId}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-6 justify-between md:justify-end">
                   <div className="font-bold text-2xl text-rose-600">{formatCurrency(payment.total)}</div>

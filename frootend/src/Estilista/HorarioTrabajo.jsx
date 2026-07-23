@@ -359,13 +359,13 @@ export default function HorarioTrabajo() {
           )}
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
           {[
             { label: "Total semana", value: totalSemana, icon: "appointments", iconCls: "bg-slate-50 text-slate-600" },
             { label: "Pendientes", value: pendientes, icon: "calendar", iconCls: "bg-amber-50 text-amber-600" },
             { label: "Completadas", value: completadas, icon: "services", iconCls: "bg-emerald-50 text-emerald-600" },
           ].map((item) => (
-            <div key={item.label} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+            <div key={item.label} className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-5">
               <div className={`p-3 rounded-xl ${item.iconCls}`}>
                 <SidebarIcon name={item.icon} className="h-5 w-5" />
               </div>

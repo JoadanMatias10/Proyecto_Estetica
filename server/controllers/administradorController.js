@@ -13,10 +13,12 @@ const StaffMember = require("../models/MiembroPersonal");
 const AccountAccessToken = require("../models/TokenAccesoCuenta");
 const Promotion = require("../models/Promocion");
 const Sale = require("../models/Venta");
+const ClientPayment = require("../models/PagoCliente");
 const InventoryMovement = require("../models/MovimientoInventario");
 const { verifyPassword } = require("../utils/contrasena");
 const { createToken, verifyToken } = require("../utils/auth");
 const { recordRecentOperation } = require("../utils/recentOperationTracker");
+const { buildPaymentTicket } = require("../utils/paymentTicket");
 const {
   ACCOUNT_STATUS,
   INVITE_EXPIRATION_MS,
@@ -33,6 +35,29 @@ const {
   normalizeServiceSegment,
   normalizeServiceSegmentInRecord,
 } = require("../utils/serviceSegments");
+const {
+  DATASET_COLUMNS: APPOINTMENT_CLASSIFICATION_COLUMNS,
+  buildAppointmentClassificationDataset,
+  buildAppointmentClassificationOptions,
+  predictAppointmentCancellation,
+  trainAppointmentCancellationModel,
+} = require("../utils/clasificacionCitas");
+const {
+  DATASET_COLUMNS: PRODUCT_DEMAND_REGRESSION_COLUMNS,
+  NUMERIC_FEATURES: PRODUCT_DEMAND_NUMERIC_FEATURES,
+  CATEGORICAL_FEATURES: PRODUCT_DEMAND_CATEGORICAL_FEATURES,
+  buildProductDemandRegressionDataset,
+  predictProductDemand,
+  trainProductDemandModel,
+} = require("../utils/regresionDemandaProductos");
+const {
+  DATASET_COLUMNS: SERVICE_CLUSTERING_COLUMNS,
+  FEATURE_DEFINITIONS: SERVICE_CLUSTERING_FEATURES,
+  K_CLUSTERS: SERVICE_CLUSTER_COUNT,
+  buildServiceRecommendationDataset,
+  recommendServicesForClient,
+  runServiceRecommendationClustering,
+} = require("../utils/clusteringRecomendacionServicios");
 
 const router = express.Router();
 
@@ -57,6 +82,9 @@ const ALLOWED_POLICY_DOCUMENT_TYPES = new Set([
 ]);
 const PRODUCT_UNITS = new Set(["ml", "g"]);
 const SALE_PAYMENT_METHODS = new Set(["Efectivo", "Tarjeta", "Transferencia"]);
+const CLIENT_PAYMENT_STATUSES = new Set(["Pendiente", "Procesando", "Confirmado", "Rechazado"]);
+const CLIENT_PAYMENT_TYPES = new Set(["Producto", "Servicio"]);
+const CLIENT_REVIEW_PAYMENT_METHODS = new Set(["Transferencia", "Pago en sucursal"]);
 const loginAttempts = new Map();
 const historialRespaldos = [];
 const LIMITE_HISTORIAL_RESPALDOS = 50;
@@ -74,6 +102,7 @@ const ETIQUETAS_COLECCIONES = {
   tokens_acceso_cuenta: "Tokens de acceso",
   promociones: "Promociones",
   ventas: "Ventas",
+  pagos_cliente: "Pagos de clientes",
   movimientos_inventario: "Movimientos de inventario",
   configuracion_respaldo_automatico_admin: "Configuracion de respaldo automatico",
 };
@@ -139,6 +168,7 @@ function mapSale(record) {
   if (!source) return null;
   return {
     ...source,
+    clientPaymentId: source.clientPaymentId ? String(source.clientPaymentId) : "",
     estado: source.estado === "Anulada" ? "Anulada" : "Activa",
     anuladaAt: source.anuladaAt || null,
     anuladaPor: source.anuladaPor || "",
@@ -150,6 +180,197 @@ function mapSale(record) {
       }))
       : [],
   };
+}
+
+function mapClientPayment(record) {
+  const source = mapId(record);
+  if (!source) return null;
+  const ticket =
+    source.estatus === "Confirmado"
+      ? buildPaymentTicket(source)
+      : { recipient: "", whatsappUrl: "" };
+
+  return {
+    ...source,
+    userId: source.userId ? String(source.userId) : "",
+    appointmentId: source.appointmentId ? String(source.appointmentId) : "",
+    saleId: source.saleId ? String(source.saleId) : "",
+    whatsappRecipient: ticket.recipient,
+    whatsappTicketUrl: ticket.whatsappUrl,
+    detalle: Array.isArray(source.detalle)
+      ? source.detalle.map((item) => ({
+        ...item,
+        itemId: item?.itemId ? String(item.itemId) : "",
+      }))
+      : [],
+  };
+}
+
+function createPaymentProcessingError(message, statusCode = 400) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
+async function rollbackClientProductSale(context) {
+  if (!context) return;
+
+  try {
+    if (context.saleId) {
+      await Sale.findByIdAndDelete(context.saleId);
+    }
+    if (context.movementIds?.length) {
+      await InventoryMovement.deleteMany({ _id: { $in: context.movementIds } });
+    }
+    for (const change of context.stockChanges || []) {
+      await Product.updateOne(
+        { _id: change.productId },
+        { $inc: { stock: change.quantity } }
+      );
+    }
+  } catch (rollbackError) {
+    console.error("No fue posible revertir por completo la venta del pago cliente:", rollbackError);
+  }
+}
+
+async function createSaleFromClientProductPayment(payment, adminName) {
+  if (payment.saleId) {
+    const existingSale = await Sale.findById(payment.saleId);
+    if (existingSale) {
+      return {
+        sale: existingSale,
+        saleId: existingSale._id,
+        movementIds: [],
+        stockChanges: [],
+        reused: true,
+      };
+    }
+  }
+
+  const rawItems = Array.isArray(payment.detalle) ? payment.detalle : [];
+  if (!rawItems.length) {
+    throw createPaymentProcessingError("El pago no contiene productos para crear la venta.");
+  }
+
+  const aggregatedItems = new Map();
+  for (const item of rawItems) {
+    const productId = String(item?.itemId || "");
+    const quantity = Number(item?.cantidad || 0);
+    if (!isValidId(productId) || !Number.isInteger(quantity) || quantity <= 0) {
+      throw createPaymentProcessingError("El pago contiene productos invalidos.");
+    }
+
+    const previous = aggregatedItems.get(productId);
+    aggregatedItems.set(productId, {
+      productId,
+      quantity: Number(previous?.quantity || 0) + quantity,
+      price: Number(item?.precio || 0),
+    });
+  }
+
+  const productIds = Array.from(aggregatedItems.keys());
+  const products = await Product.find({ _id: { $in: productIds } });
+  const productsById = new Map(products.map((product) => [String(product._id), product]));
+  if (productsById.size !== productIds.length) {
+    throw createPaymentProcessingError("Uno o mas productos del pago ya no existen.", 404);
+  }
+
+  const saleItems = [];
+  for (const item of aggregatedItems.values()) {
+    const product = productsById.get(item.productId);
+    const stock = Number(product.stock || 0);
+    if (stock < item.quantity) {
+      throw createPaymentProcessingError(
+        `Stock insuficiente para ${product.nombre}. Disponible: ${stock}.`
+      );
+    }
+
+    const subtotal = item.price * item.quantity;
+    saleItems.push({
+      productId: product._id,
+      producto: product.nombre,
+      cantidad: item.quantity,
+      precioUnitario: item.price,
+      subtotal,
+    });
+  }
+
+  const context = {
+    sale: null,
+    saleId: null,
+    movementIds: [],
+    stockChanges: [],
+    reused: false,
+  };
+
+  try {
+    for (const item of saleItems) {
+      const updatedProduct = await Product.findOneAndUpdate(
+        {
+          _id: item.productId,
+          stock: { $gte: item.cantidad },
+        },
+        { $inc: { stock: -item.cantidad } },
+        { new: true }
+      );
+
+      if (!updatedProduct) {
+        throw createPaymentProcessingError(
+          `El stock de ${item.producto} cambio antes de confirmar. Revisa el inventario.`
+        );
+      }
+
+      const stockActual = Number(updatedProduct.stock || 0);
+      const stockAnterior = stockActual + item.cantidad;
+      context.stockChanges.push({
+        productId: updatedProduct._id,
+        quantity: item.cantidad,
+      });
+      recordRecentOperation({ collection: "productos", type: "update" });
+
+      const movement = await InventoryMovement.create({
+        productId: updatedProduct._id,
+        producto: updatedProduct.nombre,
+        marca: updatedProduct.marca || "",
+        categoria: updatedProduct.categoria || "",
+        cantidadMedida:
+          Number.isFinite(Number(updatedProduct.cantidadMedida)) &&
+          Number(updatedProduct.cantidadMedida) > 0
+            ? Number(updatedProduct.cantidadMedida)
+            : undefined,
+        unidadMedida: updatedProduct.unidadMedida || "",
+        accion: "Salida",
+        cantidad: item.cantidad,
+        usuario: adminName,
+        stockAnterior,
+        stockActual,
+      });
+      context.movementIds.push(movement._id);
+      recordRecentOperation({ collection: "movimientos_inventario", type: "insert" });
+    }
+
+    const subtotal = saleItems.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
+    const sale = await Sale.create({
+      clientPaymentId: payment._id,
+      cliente: payment.cliente?.nombre || "Cliente web",
+      usuario: adminName,
+      metodoPago: "Transferencia",
+      pagoCon: 0,
+      cambio: 0,
+      items: saleItems,
+      subtotal,
+      total: subtotal,
+      estado: "Activa",
+    });
+    context.sale = sale;
+    context.saleId = sale._id;
+    recordRecentOperation({ collection: "ventas", type: "insert" });
+
+    return context;
+  } catch (error) {
+    await rollbackClientProductSale(context);
+    throw error;
+  }
 }
 
 function getKey(req, usuario) {
@@ -387,6 +608,165 @@ function buildFieldDateQuery(field, fromDate, toDate) {
   const dateRange = buildDateRangeFilter(fromDate, toDate);
   if (!Object.keys(dateRange).length) return {};
   return { [field]: dateRange };
+}
+
+async function loadAppointmentClassificationRows({ desde = null, hasta = null, limit = 1000 } = {}) {
+  const historyFilter = {
+    estado: { $in: ["cancelada", "completada"] },
+    ...(hasta ? { fechaHora: { $lte: hasta } } : {}),
+  };
+  const appointments = await Appointment.find(historyFilter)
+    .select("userId serviceId servicio servicioPrecio duracionMinutos fechaHora estado createdAt updatedAt")
+    .sort({ fechaHora: 1, createdAt: 1 })
+    .lean();
+
+  const userIds = Array.from(new Set(
+    appointments
+      .map((appointment) => String(appointment.userId || ""))
+      .filter((userId) => isValidId(userId))
+  )).map((userId) => new mongoose.Types.ObjectId(userId));
+
+  const [users, services] = await Promise.all([
+    userIds.length
+      ? User.find({ _id: { $in: userIds } })
+          .select("nombre apellidoPaterno apellidoMaterno createdAt reminderSettings notificationPreferences")
+          .lean()
+      : Promise.resolve([]),
+    Service.find()
+      .select("nombre segmento subcategoria precio tiempo")
+      .lean(),
+  ]);
+
+  const historyRows = buildAppointmentClassificationDataset({ appointments, users, services });
+  const filteredRows = historyRows.filter((row) => {
+    const appointmentTime = new Date(row.fechaHora).getTime();
+    if (desde && appointmentTime < desde.getTime()) return false;
+    if (hasta && appointmentTime > hasta.getTime()) return false;
+    return true;
+  });
+  const safeLimit = Math.min(Math.max(Number(limit) || 1000, 20), 1000);
+  const datasetAsc = filteredRows.slice(-safeLimit);
+
+  return {
+    datasetAsc,
+    options: buildAppointmentClassificationOptions(datasetAsc),
+  };
+}
+
+let appointmentClassificationModelCache = null;
+
+function buildAppointmentClassificationCacheKey(rows) {
+  let hash = 2166136261;
+  rows.forEach((row) => {
+    const signature = APPOINTMENT_CLASSIFICATION_COLUMNS
+      .map((column) => String(row[column] ?? ""))
+      .join("|");
+    for (let index = 0; index < signature.length; index += 1) {
+      hash ^= signature.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+  });
+  return `${rows.length}:${hash >>> 0}`;
+}
+
+function getAppointmentClassificationModel(rows) {
+  const key = buildAppointmentClassificationCacheKey(rows);
+  if (appointmentClassificationModelCache?.key === key) {
+    return appointmentClassificationModelCache.context;
+  }
+  const context = trainAppointmentCancellationModel(rows);
+  if (context.available) appointmentClassificationModelCache = { key, context };
+  return context;
+}
+
+async function loadProductDemandRegressionData() {
+  const [sales, products] = await Promise.all([
+    Sale.find({ estado: { $ne: "Anulada" } })
+      .select("cliente usuario metodoPago items subtotal total estado createdAt updatedAt")
+      .sort({ createdAt: 1, _id: 1 })
+      .lean(),
+    Product.find()
+      .select("nombre categoria marca precio stock rating destacadoInicio")
+      .sort({ nombre: 1, _id: 1 })
+      .lean(),
+  ]);
+
+  return buildProductDemandRegressionDataset({ sales, products });
+}
+
+let productDemandModelCache = null;
+
+function buildProductDemandCacheKey(rows) {
+  let hash = 2166136261;
+  rows.forEach((row) => {
+    const signature = PRODUCT_DEMAND_REGRESSION_COLUMNS
+      .map((column) => String(row[column] ?? ""))
+      .join("|");
+    for (let index = 0; index < signature.length; index += 1) {
+      hash ^= signature.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+  });
+  return `${rows.length}:${hash >>> 0}`;
+}
+
+function getProductDemandModel(rows) {
+  const key = buildProductDemandCacheKey(rows);
+  if (productDemandModelCache?.key === key) return productDemandModelCache.context;
+  const context = trainProductDemandModel(rows);
+  if (context.available) productDemandModelCache = { key, context };
+  return context;
+}
+
+async function loadServiceRecommendationData() {
+  const payments = await ClientPayment.find({
+    tipo: "Servicio",
+    estatus: { $in: ["Pagado", "Confirmado"] },
+  })
+    .select("userId tipo total metodo estatus detalle notas createdAt updatedAt")
+    .sort({ createdAt: 1, _id: 1 })
+    .lean();
+  const userIds = Array.from(new Set(
+    payments.map((payment) => String(payment.userId || "")).filter((id) => isValidId(id))
+  )).map((id) => new mongoose.Types.ObjectId(id));
+  const [users, services] = await Promise.all([
+    userIds.length
+      ? User.find({ _id: { $in: userIds } })
+          .select("nombre apellidoPaterno apellidoMaterno correo createdAt")
+          .lean()
+      : Promise.resolve([]),
+    Service.find()
+      .select("nombre segmento subcategoria precio")
+      .sort({ nombre: 1, _id: 1 })
+      .lean(),
+  ]);
+  return buildServiceRecommendationDataset({ payments, users, services });
+}
+
+let serviceRecommendationCache = null;
+
+function buildServiceRecommendationCacheKey(dataset) {
+  let hash = 2166136261;
+  dataset.rows.forEach((row) => {
+    const signature = [
+      row.clienteId,
+      row.servicioFavoritoId,
+      ...SERVICE_CLUSTERING_COLUMNS.map((column) => row[column]),
+    ].join("|");
+    for (let index = 0; index < signature.length; index += 1) {
+      hash ^= signature.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+  });
+  return `${dataset.source.interactions}:${dataset.source.items}:${dataset.rows.length}:${hash >>> 0}`;
+}
+
+async function getServiceRecommendationContext(dataset) {
+  const key = buildServiceRecommendationCacheKey(dataset);
+  if (serviceRecommendationCache?.key === key) return serviceRecommendationCache.context;
+  const context = await runServiceRecommendationClustering(dataset);
+  if (context.available) serviceRecommendationCache = { key, context };
+  return context;
 }
 
 function buildBuckets(period, now) {
@@ -1031,6 +1411,337 @@ router.get("/stats", async (req, res) => {
   });
 });
 
+router.get("/appointments/classification-dataset", async (req, res) => {
+  try {
+    const desdeRaw = normalizeString(req.query.desde || "");
+    const hastaRaw = normalizeString(req.query.hasta || "");
+    const limit = Math.min(Math.max(parsePositiveInteger(req.query.limit, 1000), 20), 1000);
+
+    let desde = null;
+    let hasta = null;
+
+    if (desdeRaw) {
+      const parsedDesde = parseDateInput(desdeRaw);
+      if (!parsedDesde) {
+        return res.status(400).json({ errors: ["Fecha inicio invalida."] });
+      }
+      desde = getStartOfDay(parsedDesde);
+    }
+
+    if (hastaRaw) {
+      const parsedHasta = parseDateInput(hastaRaw);
+      if (!parsedHasta) {
+        return res.status(400).json({ errors: ["Fecha fin invalida."] });
+      }
+      hasta = getEndOfDay(parsedHasta);
+    }
+
+    if (desde && hasta && desde > hasta) {
+      return res.status(400).json({ errors: ["La fecha inicio no puede ser mayor que la fecha fin."] });
+    }
+
+    const { datasetAsc, options } = await loadAppointmentClassificationRows({ desde, hasta, limit });
+    const modelContext = getAppointmentClassificationModel(datasetAsc);
+    const dataset = [...datasetAsc].reverse();
+    const labelledRows = dataset.filter((row) => ["cancelada", "completada"].includes(row.estado));
+    const canceladas = labelledRows.filter((row) => row.citaCancelada === 1).length;
+    const noCanceladas = labelledRows.length - canceladas;
+
+    return res.json({
+      meta: {
+        generatedAt: new Date().toISOString(),
+        source: "mongodb",
+        collections: ["usuarios", "citas", "servicios"],
+        model: "RandomForestClassifier",
+        datasetColumns: APPOINTMENT_CLASSIFICATION_COLUMNS,
+        traceabilityColumns: ["id", "cliente", "fecha", "fechaHora", "estado"],
+        excludedFromTraining: ["id", "cliente", "fecha", "fechaHora", "estado"],
+        target: "citaCancelada",
+        classes: [
+          { value: 0, label: "no cancelada" },
+          { value: 1, label: "cancelada" },
+        ],
+      },
+      summary: {
+        totalRows: dataset.length,
+        labelledRows: labelledRows.length,
+        canceladas,
+        noCanceladas,
+        tasaCancelacion: labelledRows.length ? Number(((canceladas / labelledRows.length) * 100).toFixed(1)) : 0,
+      },
+      model: modelContext.summary,
+      options,
+      dataset,
+    });
+  } catch (error) {
+    console.error("Error en /appointments/classification-dataset:", error);
+    return res.status(500).json({ errors: ["No se pudo generar el dataset de clasificacion."] });
+  }
+});
+
+router.post("/appointments/classification-predict", async (req, res) => {
+  try {
+    const { datasetAsc } = await loadAppointmentClassificationRows({ limit: 1000 });
+    const modelContext = getAppointmentClassificationModel(datasetAsc);
+    if (!modelContext.available) {
+      return res.status(422).json({
+        errors: [modelContext.summary?.message || "No hay datos suficientes para entrenar el modelo."],
+        model: modelContext.summary,
+      });
+    }
+
+    const numericFields = [
+      ["mesCita", 1, 12],
+      ["horaCita", 0, 23],
+      ["precioServicio", 0, Number.MAX_SAFE_INTEGER],
+      ["duracionMinutos", 15, 24 * 60],
+      ["diasAnticipacion", 0, 365],
+      ["anticipacionRecordatorioHoras", 0, 24 * 30],
+      ["citasPrevias", 0, Number.MAX_SAFE_INTEGER],
+      ["cancelacionesPrevias", 0, Number.MAX_SAFE_INTEGER],
+      ["diasDesdeRegistroCliente", 0, Number.MAX_SAFE_INTEGER],
+    ];
+    const errors = [];
+    const input = {
+      mesCita: Number(req.body.mesCita),
+      diaSemanaCita: normalizeString(req.body.diaSemanaCita),
+      horaCita: Number(req.body.horaCita),
+      servicio: normalizeString(req.body.servicio),
+      segmentoServicio: normalizeString(req.body.segmentoServicio),
+      subcategoriaServicio: normalizeString(req.body.subcategoriaServicio),
+      precioServicio: Number(req.body.precioServicio),
+      duracionMinutos: Number(req.body.duracionMinutos),
+      diasAnticipacion: Number(req.body.diasAnticipacion),
+      recordatorioActivo: req.body.recordatorioActivo !== false,
+      canalRecordatorio: normalizeString(req.body.canalRecordatorio),
+      anticipacionRecordatorioHoras: Number(req.body.anticipacionRecordatorioHoras),
+      citasPrevias: Number(req.body.citasPrevias),
+      cancelacionesPrevias: Number(req.body.cancelacionesPrevias),
+      diasDesdeRegistroCliente: Number(req.body.diasDesdeRegistroCliente),
+    };
+
+    numericFields.forEach(([field, min, max]) => {
+      if (!Number.isFinite(input[field]) || input[field] < min || input[field] > max) {
+        errors.push(`Valor invalido para ${field}.`);
+      }
+    });
+    if (!input.diaSemanaCita) errors.push("Dia de la semana es obligatorio.");
+    if (!input.servicio) errors.push("Servicio es obligatorio.");
+    if (!input.segmentoServicio) errors.push("Segmento es obligatorio.");
+    if (!input.subcategoriaServicio) errors.push("Subcategoria es obligatoria.");
+    if (!input.canalRecordatorio) errors.push("Canal de recordatorio es obligatorio.");
+    if (input.cancelacionesPrevias > input.citasPrevias) {
+      errors.push("Las cancelaciones previas no pueden superar las citas previas.");
+    }
+    if (errors.length) return res.status(400).json({ errors });
+
+    const prediction = predictAppointmentCancellation(modelContext, input);
+    return res.json({
+      prediction,
+      model: modelContext.summary,
+      input: {
+        ...input,
+        tasaCancelacionPrevia: prediction.tasaCancelacionPrevia,
+      },
+    });
+  } catch (error) {
+    console.error("Error en /appointments/classification-predict:", error);
+    return res.status(500).json({ errors: ["No se pudo calcular la prediccion de la cita."] });
+  }
+});
+
+router.get("/sales/regression-dataset", async (_req, res) => {
+  try {
+    const demandData = await loadProductDemandRegressionData();
+    const modelContext = getProductDemandModel(demandData.rows);
+    const labelledRows = demandData.rows.filter((row) =>
+      row.demandaMesSiguiente !== null && Number.isFinite(Number(row.demandaMesSiguiente))
+    );
+    const demandByPeriod = new Map();
+
+    demandData.rows.forEach((row) => {
+      demandByPeriod.set(
+        row.periodo,
+        Number(demandByPeriod.get(row.periodo) || 0) + Number(row.unidadesVendidasMes || 0)
+      );
+    });
+    const periodDemand = Array.from(demandByPeriod.entries())
+      .map(([periodo, units]) => ({ periodo, units }))
+      .sort((left, right) => left.periodo.localeCompare(right.periodo));
+    const highestDemandPeriod = [...periodDemand].sort((left, right) => right.units - left.units)[0] || null;
+    const dataset = [...demandData.rows].sort((left, right) => {
+      const byPeriod = right.periodo.localeCompare(left.periodo);
+      return byPeriod || left.producto.localeCompare(right.producto, "es");
+    });
+
+    return res.json({
+      meta: {
+        generatedAt: new Date().toISOString(),
+        source: "mongodb",
+        collections: ["ventas", "productos"],
+        model: "RandomForestRegression",
+        datasetColumns: PRODUCT_DEMAND_REGRESSION_COLUMNS,
+        numericFeatures: PRODUCT_DEMAND_NUMERIC_FEATURES,
+        categoricalFeatures: PRODUCT_DEMAND_CATEGORICAL_FEATURES,
+        traceabilityColumns: ["productId", "periodo", "periodoSiguiente", "mesNombre", "stockActual"],
+        excludedFromTraining: ["productId", "periodo", "periodoSiguiente", "mesNombre", "stockActual"],
+        target: "demandaMesSiguiente",
+        targetDescription: "Unidades del producto que se venderan durante el mes siguiente.",
+        dateTransformation: "createdAt se transforma en anio, mes, trimestre e indice cronologico; la fecha original no entra al modelo.",
+      },
+      summary: {
+        sourceTransactions: demandData.source.transactions,
+        syntheticTransactions: demandData.source.syntheticTransactions,
+        itemLines: demandData.source.itemLines,
+        totalUnits: demandData.source.totalUnits,
+        totalRevenue: demandData.source.totalRevenue,
+        products: demandData.products.length,
+        periods: demandData.periods.length,
+        transformedRows: demandData.rows.length,
+        labelledRows: labelledRows.length,
+        firstDate: demandData.source.firstDate,
+        lastDate: demandData.source.lastDate,
+        highestDemandPeriod,
+      },
+      model: modelContext.summary,
+      options: {
+        products: demandData.products,
+      },
+      periodDemand,
+      dataset,
+    });
+  } catch (error) {
+    console.error("Error en /sales/regression-dataset:", error);
+    return res.status(500).json({ errors: ["No se pudo generar el dataset de regresion de demanda."] });
+  }
+});
+
+router.post("/sales/regression-predict", async (req, res) => {
+  try {
+    const productId = normalizeString(req.body.productId || "");
+    if (!isValidId(productId)) {
+      return res.status(400).json({ errors: ["Selecciona un producto valido."] });
+    }
+
+    const demandData = await loadProductDemandRegressionData();
+    const modelContext = getProductDemandModel(demandData.rows);
+    if (!modelContext.available) {
+      return res.status(422).json({
+        errors: [modelContext.summary?.message || "No hay datos suficientes para entrenar el modelo."],
+        model: modelContext.summary,
+      });
+    }
+
+    const productRows = demandData.rows.filter((row) => row.productId === productId);
+    const latestRow = productRows[productRows.length - 1];
+    const product = demandData.products.find((entry) => entry.id === productId);
+    if (!latestRow || !product) {
+      return res.status(404).json({ errors: ["El producto no tiene historial suficiente para generar la prediccion."] });
+    }
+
+    const prediction = predictProductDemand(modelContext, latestRow);
+    const stockActual = Number(product.stockActual || 0);
+    const coverageMonths = prediction.predictedDemand > 0
+      ? Number((stockActual / prediction.predictedDemand).toFixed(2))
+      : null;
+
+    return res.json({
+      prediction: {
+        ...prediction,
+        productId,
+        producto: product.nombre,
+        categoria: product.categoria,
+        marca: product.marca,
+        stockActual,
+        coverageMonths,
+        restockSuggested: Math.max(0, prediction.suggestedUnits - stockActual),
+      },
+      input: latestRow,
+      model: modelContext.summary,
+    });
+  } catch (error) {
+    console.error("Error en /sales/regression-predict:", error);
+    return res.status(500).json({ errors: ["No se pudo calcular la demanda del producto."] });
+  }
+});
+
+router.get("/services/clustering-dataset", async (_req, res) => {
+  try {
+    const dataset = await loadServiceRecommendationData();
+    const context = await getServiceRecommendationContext(dataset);
+    if (!context.available) {
+      return res.status(422).json({
+        errors: [context.summary?.message || "No hay datos suficientes para ejecutar K-Means."],
+        model: context.summary,
+      });
+    }
+
+    const rows = [...context.rows].sort((left, right) => {
+      const byCluster = left.clusterId - right.clusterId;
+      return byCluster || left.cliente.localeCompare(right.cliente, "es");
+    });
+
+    return res.json({
+      meta: {
+        generatedAt: new Date().toISOString(),
+        source: "mongodb",
+        collections: ["pagos_cliente", "usuarios", "servicios"],
+        method: "K-Means",
+        k: SERVICE_CLUSTER_COUNT,
+        datasetColumns: SERVICE_CLUSTERING_COLUMNS,
+        featureDefinitions: SERVICE_CLUSTERING_FEATURES,
+        traceabilityColumns: ["clienteId", "cliente", "correo", "servicioFavorito"],
+        excludedFromClustering: ["clienteId", "cliente", "correo", "servicioFavorito"],
+        transformation: "Las interacciones se agrupan por cliente y las variables numericas se estandarizan con z-score.",
+      },
+      summary: {
+        sourceInteractions: dataset.source.interactions,
+        syntheticInteractions: dataset.source.syntheticInteractions,
+        serviceItems: dataset.source.items,
+        clients: dataset.rows.length,
+        services: dataset.services.length,
+        firstDate: dataset.source.firstDate,
+        lastDate: dataset.source.lastDate,
+      },
+      model: context.summary,
+      clusters: context.clusters,
+      options: {
+        clients: rows.map((row) => ({
+          id: row.clienteId,
+          nombre: row.cliente,
+          cluster: row.cluster,
+        })).sort((left, right) => left.nombre.localeCompare(right.nombre, "es")),
+      },
+      dataset: rows,
+    });
+  } catch (error) {
+    console.error("Error en /services/clustering-dataset:", error);
+    return res.status(500).json({ errors: ["No se pudo generar el clustering de servicios."] });
+  }
+});
+
+router.post("/services/clustering-recommend", async (req, res) => {
+  try {
+    const clientId = normalizeString(req.body.clientId || "");
+    if (!isValidId(clientId)) {
+      return res.status(400).json({ errors: ["Selecciona un cliente valido."] });
+    }
+    const dataset = await loadServiceRecommendationData();
+    const context = await getServiceRecommendationContext(dataset);
+    if (!context.available) {
+      return res.status(422).json({ errors: [context.summary?.message || "K-Means no esta disponible."] });
+    }
+    const recommendation = recommendServicesForClient(context, clientId, dataset.clientServiceCounts);
+    return res.json({ recommendation, model: context.summary });
+  } catch (error) {
+    if (error.message === "El cliente no forma parte del dataset de clustering.") {
+      return res.status(404).json({ errors: [error.message] });
+    }
+    console.error("Error en /services/clustering-recommend:", error);
+    return res.status(500).json({ errors: ["No se pudo generar la recomendacion de servicios."] });
+  }
+});
+
 router.get("/reports", async (req, res) => {
   const tipo = normalizeString(req.query.tipo || "Todos");
   const desdeRaw = normalizeString(req.query.desde || "");
@@ -1161,6 +1872,264 @@ router.get("/reports", async (req, res) => {
     },
     rows,
   });
+});
+
+router.get("/client-payments", async (req, res) => {
+  const status = sanitizeText(req.query.estatus || "Todos");
+  const type = sanitizeText(req.query.tipo || "Todos");
+  const method = sanitizeText(req.query.metodo || "Todos");
+
+  if (status !== "Todos" && !CLIENT_PAYMENT_STATUSES.has(status)) {
+    return res.status(400).json({ errors: ["Estado de pago invalido."] });
+  }
+  if (type !== "Todos" && !CLIENT_PAYMENT_TYPES.has(type)) {
+    return res.status(400).json({ errors: ["Tipo de pago invalido."] });
+  }
+  if (method !== "Todos" && !CLIENT_REVIEW_PAYMENT_METHODS.has(method)) {
+    return res.status(400).json({ errors: ["Metodo de pago invalido."] });
+  }
+
+  const reviewMethods = Array.from(CLIENT_REVIEW_PAYMENT_METHODS);
+  const methodQuery = method === "Todos" ? { $in: reviewMethods } : method;
+  const query = { metodo: methodQuery };
+  if (status !== "Todos") query.estatus = status;
+  if (type !== "Todos") query.tipo = type;
+
+  const [payments, pendingCount, confirmedCount, rejectedCount, totalCount] = await Promise.all([
+    ClientPayment.find(query).sort({ createdAt: -1 }).limit(200).lean(),
+    ClientPayment.countDocuments({
+      metodo: methodQuery,
+      estatus: { $in: ["Pendiente", "Procesando"] },
+    }),
+    ClientPayment.countDocuments({ metodo: methodQuery, estatus: "Confirmado" }),
+    ClientPayment.countDocuments({ metodo: methodQuery, estatus: "Rechazado" }),
+    ClientPayment.countDocuments({ metodo: methodQuery }),
+  ]);
+
+  return res.json({
+    filters: { estatus: status, tipo: type, metodo: method },
+    summary: {
+      total: totalCount,
+      pendientes: pendingCount,
+      confirmados: confirmedCount,
+      rechazados: rejectedCount,
+    },
+    payments: payments.map(mapClientPayment),
+  });
+});
+
+router.patch("/client-payments/:id/status", async (req, res) => {
+  const paymentId = sanitizeText(req.params.id);
+  const status = sanitizeText(req.body.estatus);
+  const adminNotes = sanitizeText(req.body.notasAdmin || "").slice(0, 300);
+
+  if (!isValidId(paymentId)) {
+    return res.status(400).json({ errors: ["Pago invalido."] });
+  }
+  if (!["Confirmado", "Rechazado"].includes(status)) {
+    return res.status(400).json({ errors: ["Selecciona Confirmado o Rechazado."] });
+  }
+  if (status === "Rechazado" && !adminNotes) {
+    return res.status(400).json({ errors: ["Indica el motivo del rechazo."] });
+  }
+
+  const currentPayment = await ClientPayment.findById(paymentId);
+  if (!currentPayment || !CLIENT_REVIEW_PAYMENT_METHODS.has(currentPayment.metodo)) {
+    return res.status(404).json({ errors: ["Pago no encontrado."] });
+  }
+  const paymentLabel =
+    currentPayment.metodo === "Pago en sucursal" ? "pago en sucursal" : "transferencia";
+  if (currentPayment.estatus === status) {
+    return res.json({
+      message: `El ${paymentLabel} ya estaba en estado ${status}.`,
+      payment: mapClientPayment(currentPayment.toObject()),
+    });
+  }
+  if (currentPayment.estatus !== "Pendiente") {
+    return res.status(409).json({
+      errors: [
+        currentPayment.estatus === "Procesando"
+          ? "El pago se esta procesando. Actualiza la pagina en unos segundos."
+          : "El pago ya fue revisado y su resultado no se puede cambiar.",
+      ],
+    });
+  }
+  if (
+    status === "Confirmado" &&
+    currentPayment.metodo === "Transferencia" &&
+    (!currentPayment.referencia || !currentPayment.comprobanteUrl)
+  ) {
+    return res.status(400).json({
+      errors: ["No se puede confirmar una transferencia sin referencia y comprobante."],
+    });
+  }
+
+  const adminName =
+    sanitizeText(req.admin.username) ||
+    sanitizeText(req.admin.correo) ||
+    "Admin";
+
+  if (status === "Rechazado") {
+    let rejectedPayment = null;
+    try {
+      rejectedPayment = await ClientPayment.findOneAndUpdate(
+        { _id: paymentId, estatus: "Pendiente" },
+        {
+          $set: {
+            estatus: "Rechazado",
+            notasAdmin: adminNotes,
+            revisadoAt: new Date(),
+            revisadoPor: adminName,
+          },
+        },
+        { new: true }
+      );
+
+      if (!rejectedPayment) {
+        return res.status(409).json({
+          errors: ["El pago fue revisado desde otra sesion."],
+        });
+      }
+
+      if (rejectedPayment.tipo === "Servicio" && rejectedPayment.appointmentId) {
+        await Appointment.updateOne(
+          {
+            _id: rejectedPayment.appointmentId,
+            paymentId: rejectedPayment._id,
+          },
+          {
+            $set: {
+              estatusPago: "Rechazado",
+              pagadoAt: null,
+            },
+          }
+        );
+      }
+      recordRecentOperation({ collection: "pagos_cliente", type: "update" });
+
+      return res.json({
+        message: "Pago rechazado.",
+        payment: mapClientPayment(rejectedPayment.toObject()),
+      });
+    } catch (error) {
+      if (rejectedPayment?._id) {
+        await ClientPayment.updateOne(
+          { _id: rejectedPayment._id, estatus: "Rechazado" },
+          {
+            $set: {
+              estatus: "Pendiente",
+              notasAdmin: "",
+              revisadoAt: null,
+              revisadoPor: "",
+            },
+          }
+        ).catch(() => null);
+      }
+      console.error("Error rechazando pago de cliente:", error);
+      return res.status(500).json({ errors: ["No se pudo rechazar el pago."] });
+    }
+  }
+
+  const payment = await ClientPayment.findOneAndUpdate(
+    { _id: paymentId, estatus: "Pendiente" },
+    {
+      $set: {
+        estatus: "Procesando",
+        notasAdmin: adminNotes,
+        revisadoAt: new Date(),
+        revisadoPor: adminName,
+      },
+    },
+    { new: true }
+  );
+
+  if (!payment) {
+    return res.status(409).json({
+      errors: ["El pago fue revisado desde otra sesion."],
+    });
+  }
+
+  let saleContext = null;
+  let serviceAppointmentUpdated = false;
+
+  try {
+    if (payment.tipo === "Producto") {
+      saleContext = await createSaleFromClientProductPayment(payment, adminName);
+      payment.saleId = saleContext.saleId;
+    } else if (payment.tipo === "Servicio") {
+      if (!payment.appointmentId) {
+        throw createPaymentProcessingError(
+          "El pago de servicio no esta ligado a una cita. Rechaza este pago y solicita uno nuevo."
+        );
+      }
+
+      const appointment = await Appointment.findOneAndUpdate(
+        {
+          _id: payment.appointmentId,
+          paymentId: payment._id,
+          estado: { $ne: "cancelada" },
+        },
+        {
+          $set: {
+            estatusPago: "Pagado",
+            pagadoAt: new Date(),
+          },
+        },
+        { new: true }
+      );
+
+      if (!appointment) {
+        throw createPaymentProcessingError(
+          "La cita ligada al pago no existe o fue cancelada."
+        );
+      }
+      serviceAppointmentUpdated = true;
+    }
+
+    payment.estatus = "Confirmado";
+    await payment.save();
+    recordRecentOperation({ collection: "pagos_cliente", type: "update" });
+
+    return res.json({
+      message:
+        payment.tipo === "Producto"
+          ? "Pago confirmado. La venta fue creada y el inventario actualizado."
+          : "Pago confirmado. La cita quedo marcada como servicio pagado.",
+      payment: mapClientPayment(payment.toObject()),
+      sale: saleContext?.sale ? mapSale(saleContext.sale.toObject()) : null,
+    });
+  } catch (error) {
+    if (saleContext && !saleContext.reused) {
+      await rollbackClientProductSale(saleContext);
+    }
+    if (serviceAppointmentUpdated && payment.appointmentId) {
+      await Appointment.updateOne(
+        { _id: payment.appointmentId, paymentId: payment._id },
+        { $set: { estatusPago: "Pendiente", pagadoAt: null } }
+      ).catch(() => null);
+    }
+
+    await ClientPayment.updateOne(
+      { _id: payment._id, estatus: "Procesando" },
+      {
+        $set: {
+          estatus: "Pendiente",
+          notasAdmin: "",
+          revisadoAt: null,
+          revisadoPor: "",
+        },
+      }
+    ).catch(() => null);
+
+    console.error("Error confirmando pago de cliente:", error);
+    return res.status(error.statusCode || 500).json({
+      errors: [
+        error.statusCode
+          ? error.message
+          : "No se pudo completar la confirmacion. No se aplicaron cambios definitivos.",
+      ],
+    });
+  }
 });
 
 router.get("/sales", async (req, res) => {

@@ -23,6 +23,7 @@ function createCloudinaryUpload(folder) {
 const productUpload = createCloudinaryUpload("productos");
 const serviceUpload = createCloudinaryUpload("servicios");
 const carouselUpload = createCloudinaryUpload("carrusel");
+const paymentProofUpload = createCloudinaryUpload("comprobantes-transferencia");
 
 module.exports = {
   MAX_IMAGE_BYTES,
@@ -30,4 +31,5 @@ module.exports = {
   productUpload,
   serviceUpload,
   carouselUpload,
+  paymentProofUpload,
 };

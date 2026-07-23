@@ -290,12 +290,12 @@ export default function InformesEstadisticos() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Informes Estadisticos</h1>
           <p className="text-slate-500 text-sm">Visualizacion grafica del desempeno.</p>
         </div>
-        <div className="flex bg-slate-100 p-1 rounded-xl">
+        <div className="flex max-w-full overflow-x-auto rounded-xl bg-slate-100 p-1">
           {PERIODS.map((p) => (
             <button
               key={p}

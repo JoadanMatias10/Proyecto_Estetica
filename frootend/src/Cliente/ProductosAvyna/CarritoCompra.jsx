@@ -46,7 +46,7 @@ export default function CarritoCompra() {
       </div>
 
       {cart.length === 0 ? (
-        <div className="card p-8 text-center py-16">
+        <div className="card px-4 py-12 text-center sm:p-8 sm:py-16">
           <div className="mb-4 inline-flex items-center justify-center rounded-2xl bg-violet-50 p-4 text-violet-600">
             <SidebarIcon name="cart" className="h-12 w-12" />
           </div>

@@ -43,7 +43,7 @@ export default function EstadoCarrito() {
       <h1 className="page-title">Estado del carrito</h1>
       <p className="page-subtitle mt-2">Seguimiento del proceso de compra.</p>
 
-      <div className="card mt-8 p-8 space-y-4">
+      <div className="card mt-8 space-y-4 p-4 sm:p-8">
         {steps.map((item, index) => (
           <div key={item.step} className="flex items-center justify-between gap-4 rounded-xl bg-violet-50/50 p-4 border border-violet-100">
             <div>

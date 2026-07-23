@@ -112,7 +112,7 @@ export default function Promociones() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Promociones</h1>
           <p className="text-slate-500 text-sm">Gestiona las ofertas y descuentos vigentes.</p>
@@ -200,7 +200,7 @@ export default function Promociones() {
               placeholder="Detalles de la promocion..."
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="form-label">Descuento</label>
               <input

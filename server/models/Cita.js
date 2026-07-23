@@ -11,6 +11,14 @@ const appointmentSchema = new mongoose.Schema(
     fechaHora: { type: Date, required: true },
     notas: { type: String, default: "" },
     estado: { type: String, enum: ["pendiente", "programada", "confirmada", "completada", "cancelada"], default: "pendiente" },
+    paymentId: { type: mongoose.Schema.Types.ObjectId, ref: "ClientPayment", default: null, index: true },
+    estatusPago: {
+      type: String,
+      enum: ["Sin pago", "Pendiente", "Pagado", "Rechazado"],
+      default: "Sin pago",
+      index: true,
+    },
+    pagadoAt: { type: Date, default: null },
   },
   { timestamps: true, collection: "citas" }
 );

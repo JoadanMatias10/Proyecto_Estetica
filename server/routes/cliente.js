@@ -8,10 +8,13 @@ const Service = require("../models/Servicio");
 const StylistAvailability = require("../models/DisponibilidadEstilista");
 const StaffMember = require("../models/MiembroPersonal");
 const User = require("../models/Usuario");
+const cloudinary = require("../config/cloudinary");
+const { paymentProofUpload } = require("../middleware/multer");
 const { verifyToken } = require("../utils/auth");
 const {
   buildClientNotificationResponse,
   deliverClientAppointmentNotification,
+  triggerDueAppointmentReminderScan,
 } = require("../utils/clientNotifications");
 const { parseServiceDurationMinutes } = require("../utils/serviceDuration");
 const {
@@ -48,6 +51,61 @@ const DEFAULT_NOTIFICATION_PREFERENCES = {
 };
 const PAYMENT_TYPES = new Set(["Producto", "Servicio"]);
 const PAYMENT_METHODS = new Set(["Tarjeta", "Transferencia", "Pago en sucursal"]);
+const DEMO_BANK_CLABE = "000000000000000000";
+const CLOUDINARY_UNAVAILABLE_MESSAGE =
+  "La carga de comprobantes no esta disponible. Configura Cloudinary en el servidor.";
+
+function buildBankTransferConfig() {
+  const configuredClabe = String(process.env.BANK_TRANSFER_CLABE || "").replace(/\D/g, "");
+  const hasRealClabe = /^\d{18}$/.test(configuredClabe) && !/^0+$/.test(configuredClabe);
+
+  return {
+    bank: normalizeString(process.env.BANK_TRANSFER_BANK || "BanCoppel"),
+    beneficiary: normalizeString(process.env.BANK_TRANSFER_BENEFICIARY || "Estetica Panamericana"),
+    clabe: hasRealClabe ? configuredClabe : DEMO_BANK_CLABE,
+    account: normalizeString(process.env.BANK_TRANSFER_ACCOUNT || ""),
+    isDemo: !hasRealClabe,
+  };
+}
+
+function requirePaymentProofUploadSupport(req, res, next) {
+  const contentType = String(req.headers["content-type"] || "").toLowerCase();
+  const isMultipartRequest = contentType.includes("multipart/form-data");
+
+  if (!isMultipartRequest || cloudinary.isConfigured) {
+    return next();
+  }
+
+  return res.status(503).json({ errors: [CLOUDINARY_UNAVAILABLE_MESSAGE] });
+}
+
+async function cleanupUploadedPaymentProof(uploadedProof) {
+  const publicId = normalizeString(uploadedProof?.filename || uploadedProof?.public_id);
+  if (!publicId || !cloudinary.isConfigured) return;
+
+  try {
+    await cloudinary.uploader.destroy(publicId, {
+      invalidate: true,
+      resource_type: "image",
+    });
+  } catch (error) {
+    console.error("No fue posible eliminar el comprobante de transferencia:", error);
+  }
+}
+
+function parsePaymentDetail(value, errors) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed;
+  } catch (_error) {
+    errors.push("El detalle del pago no tiene un formato valido.");
+  }
+
+  return [];
+}
 
 function buildUserResponse(user) {
   return {
@@ -72,6 +130,9 @@ function buildAppointmentResponse(appointment) {
     fechaHora: appointment.fechaHora,
     notas: appointment.notas || "",
     estado: appointment.estado === "programada" ? "pendiente" : appointment.estado || "pendiente",
+    paymentId: appointment.paymentId ? String(appointment.paymentId) : "",
+    estatusPago: appointment.estatusPago || "Sin pago",
+    pagadoAt: appointment.pagadoAt || null,
     createdAt: appointment.createdAt,
     updatedAt: appointment.updatedAt,
   };
@@ -212,13 +273,31 @@ function buildClientPaymentResponse(payment) {
     metodo: source.metodo,
     fecha: new Date(createdAt).toISOString().slice(0, 10),
     estatus: source.estatus,
+    appointmentId: source.appointmentId ? String(source.appointmentId) : "",
+    saleId: source.saleId ? String(source.saleId) : "",
     detalle: Array.isArray(source.detalle) ? source.detalle : [],
     cliente: source.cliente || {},
     referencia: source.referencia || "",
     comprobanteUrl: source.comprobanteUrl || "",
     notas: source.notas || "",
+    notasAdmin: source.notasAdmin || "",
+    revisadoAt: source.revisadoAt || null,
+    revisadoPor: source.revisadoPor || "",
     createdAt,
   };
+}
+
+function getAppointmentPaymentStatus(paymentStatus) {
+  return ["Pagado", "Confirmado"].includes(paymentStatus) ? "Pagado" : "Pendiente";
+}
+
+function canAppointmentReceivePayment(appointment) {
+  const appointmentStatus = String(appointment?.estado || "").toLowerCase();
+  const paymentStatus = appointment?.estatusPago || "Sin pago";
+  return (
+    ["pendiente", "programada", "confirmada"].includes(appointmentStatus) &&
+    ["Sin pago", "Rechazado"].includes(paymentStatus)
+  );
 }
 
 async function normalizeClientPaymentItems(type, rawItems, errors) {
@@ -579,6 +658,8 @@ router.put("/reminder-settings", async (req, res) => {
     return res.status(404).json({ errors: ["Cliente no encontrado."] });
   }
 
+  void triggerDueAppointmentReminderScan();
+
   return res.json({
     message: "Recordatorio guardado.",
     reminderSettings: buildReminderSettingsResponse(user),
@@ -673,10 +754,30 @@ router.get("/payments", async (req, res) => {
   return res.json({ payments: payments.map(buildClientPaymentResponse) });
 });
 
-router.post("/payments", async (req, res) => {
+router.get("/payment-config", (_req, res) => {
+  const bankTransfer = buildBankTransferConfig();
+  return res.json({
+    bankTransfer: {
+      ...bankTransfer,
+      message: bankTransfer.isDemo
+        ? "Datos de demostracion. No realices transferencias a esta CLABE."
+        : "Realiza la transferencia y adjunta el comprobante para que el administrador la confirme.",
+    },
+  });
+});
+
+router.post(
+  "/payments",
+  requirePaymentProofUploadSupport,
+  paymentProofUpload.single("comprobante"),
+  async (req, res) => {
+  const uploadedProof = req.file;
   const errors = [];
   const type = normalizeString(req.body.tipo || "Producto");
   const method = normalizeClientPaymentMethod(req.body.metodo || req.body.metodoPago);
+  const appointmentId = normalizeString(req.body.appointmentId || "");
+  const reference = normalizeString(req.body.referencia || "").slice(0, 80);
+  const proofUrl = normalizeString(uploadedProof?.path || "");
 
   if (!PAYMENT_TYPES.has(type)) {
     errors.push("Tipo de pago invalido.");
@@ -684,39 +785,131 @@ router.post("/payments", async (req, res) => {
   if (!method) {
     errors.push("Metodo de pago invalido.");
   }
+  if (method === "Transferencia") {
+    if (reference.length < 4) {
+      errors.push("Escribe la referencia de la transferencia.");
+    }
+    if (!proofUrl) {
+      errors.push("Adjunta una imagen del comprobante de transferencia.");
+    }
+  } else if (uploadedProof) {
+    errors.push("El comprobante solo se utiliza para pagos por transferencia.");
+  }
 
   const user = await User.findById(req.user.id).lean();
   if (!user) {
+    await cleanupUploadedPaymentProof(uploadedProof);
     return res.status(404).json({ errors: ["Cliente no encontrado."] });
   }
 
-  const items = errors.length ? [] : await normalizeClientPaymentItems(type, req.body.detalle, errors);
-  const total = items.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
+  const rawItems = parsePaymentDetail(req.body.detalle, errors);
+  const items = errors.length ? [] : await normalizeClientPaymentItems(type, rawItems, errors);
+  let total = items.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
+  let appointment = null;
+
+  if (type === "Servicio") {
+    if (!appointmentId || !isValidId(appointmentId)) {
+      errors.push("Selecciona una cita valida para pagar el servicio.");
+    } else {
+      appointment = await Appointment.findOne({
+        _id: appointmentId,
+        userId: req.user.id,
+      }).lean();
+
+      if (!appointment) {
+        errors.push("La cita seleccionada no existe.");
+      } else if (!canAppointmentReceivePayment(appointment)) {
+        errors.push("La cita ya tiene un pago activo o no se encuentra disponible para pago.");
+      } else {
+        const selectedServiceId = items[0]?.itemId ? String(items[0].itemId) : "";
+        const appointmentServiceId = appointment.serviceId ? String(appointment.serviceId) : "";
+        const sameService = appointmentServiceId
+          ? selectedServiceId === appointmentServiceId
+          : normalizeString(items[0]?.nombre).toLowerCase() ===
+            normalizeString(appointment.servicio).toLowerCase();
+
+        if (!sameService) {
+          errors.push("El servicio del pago no coincide con el servicio reservado en la cita.");
+        } else {
+          const reservedPrice = Number(appointment.servicioPrecio);
+          if (Number.isFinite(reservedPrice) && reservedPrice > 0) {
+            items[0].precio = reservedPrice;
+            items[0].subtotal = reservedPrice;
+            total = reservedPrice;
+          }
+        }
+      }
+    }
+  }
 
   if (total <= 0) {
     errors.push("El total del pago debe ser mayor a cero.");
   }
   if (errors.length) {
+    await cleanupUploadedPaymentProof(uploadedProof);
     return res.status(400).json({ errors });
   }
 
-  const payment = await ClientPayment.create({
-    userId: req.user.id,
-    tipo: type,
-    concepto: buildPaymentConcept(type, items),
-    total,
-    metodo: method,
-    estatus: getClientPaymentStatus(method),
-    detalle: items,
-    cliente: {
-      nombre: buildClientFullName(user),
-      telefono: user.telefono || "",
-      correo: user.correo || "",
-    },
-    referencia: normalizeString(req.body.referencia || "").slice(0, 80),
-    comprobanteUrl: normalizeString(req.body.comprobanteUrl || "").slice(0, 500),
-    notas: normalizeString(req.body.notas || "").slice(0, 300),
-  });
+  let payment;
+  try {
+    payment = await ClientPayment.create({
+      userId: req.user.id,
+      tipo: type,
+      appointmentId: appointment?._id || null,
+      concepto: buildPaymentConcept(type, items),
+      total,
+      metodo: method,
+      estatus: getClientPaymentStatus(method),
+      detalle: items,
+      cliente: {
+        nombre: buildClientFullName(user),
+        telefono: user.telefono || "",
+        correo: user.correo || "",
+      },
+      referencia: reference,
+      comprobanteUrl: proofUrl,
+      comprobantePublicId: normalizeString(uploadedProof?.filename || ""),
+      comprobanteNombre: normalizeString(uploadedProof?.originalname || ""),
+      notas: normalizeString(req.body.notas || "").slice(0, 300),
+    });
+
+    if (type === "Servicio") {
+      const appointmentPaymentStatus = getAppointmentPaymentStatus(payment.estatus);
+      const linkedAppointment = await Appointment.findOneAndUpdate(
+        {
+          _id: appointment._id,
+          userId: req.user.id,
+          estado: { $in: ["pendiente", "programada", "confirmada"] },
+          $or: [
+            { estatusPago: { $exists: false } },
+            { estatusPago: { $in: ["Sin pago", "Rechazado"] } },
+          ],
+        },
+        {
+          $set: {
+            paymentId: payment._id,
+            estatusPago: appointmentPaymentStatus,
+            pagadoAt: appointmentPaymentStatus === "Pagado" ? new Date() : null,
+          },
+        },
+        { new: true }
+      );
+
+      if (!linkedAppointment) {
+        await ClientPayment.findByIdAndDelete(payment._id);
+        await cleanupUploadedPaymentProof(uploadedProof);
+        return res.status(409).json({
+          errors: ["La cita ya fue ligada a otro pago. Actualiza la pagina e intenta nuevamente."],
+        });
+      }
+    }
+  } catch (error) {
+    if (payment?._id) {
+      await ClientPayment.findByIdAndDelete(payment._id).catch(() => null);
+    }
+    await cleanupUploadedPaymentProof(uploadedProof);
+    throw error;
+  }
 
   const isPending = payment.estatus === "Pendiente";
   return res.status(201).json({
@@ -844,6 +1037,11 @@ router.post("/appointments/:id/cancel", async (req, res) => {
   }
   if (!canClientModifyAppointment(current)) {
     return res.status(400).json({ errors: ["Esta cita ya no se puede cancelar."] });
+  }
+  if (["Pendiente", "Pagado"].includes(current.estatusPago || "Sin pago")) {
+    return res.status(400).json({
+      errors: ["La cita tiene un pago activo. Contacta al negocio para solicitar la cancelacion."],
+    });
   }
 
   const appointment = await Appointment.findOneAndUpdate(

@@ -98,7 +98,7 @@ export default function DashboardCliente() {
 
   return (
     <div className="space-y-6">
-      <div className="card p-8">
+      <div className="card p-4 sm:p-8">
         <h1 className="page-title flex items-center gap-2">
           Bienvenido{user?.nombre ? `, ${user.nombre}` : ""}
           <SidebarIcon name="profile" className="h-6 w-6 text-violet-500" />

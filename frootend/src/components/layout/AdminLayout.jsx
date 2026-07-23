@@ -5,10 +5,12 @@ import AdminSidebar from "./AdminSidebar";
 import Breadcrumbs from "../ui/Breadcrumbs";
 import LoadingSpinner from "../ui/LoadingSpinner";
 import { endpoints } from "../../api";
+import useResponsiveSidebar from "./useResponsiveSidebar";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const sidebar = useResponsiveSidebar();
 
   useEffect(() => {
     const verifyAdminSession = async () => {
@@ -72,10 +74,10 @@ export default function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-rose-50/50 to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 dark:text-white transition-colors duration-300">
-      <AdminHeader />
-      <AdminSidebar />
-      <div className="max-w-7xl mx-auto w-full p-4">
-        <main className="min-h-[calc(100vh-5rem)] md:pl-24 transition-all duration-300">
+      <AdminHeader isMenuOpen={sidebar.isOpen} onMenuToggle={sidebar.toggle} />
+      <AdminSidebar isOpen={sidebar.isOpen} onClose={sidebar.close} />
+      <div className="mx-auto w-full max-w-7xl px-3 py-4 sm:p-4">
+        <main className="min-w-0 min-h-[calc(100vh-4rem)] transition-all duration-300 sm:min-h-[calc(100vh-5rem)] md:pl-24">
           <Breadcrumbs />
           <Outlet />
         </main>

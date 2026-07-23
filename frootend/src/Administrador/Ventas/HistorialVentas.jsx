@@ -150,7 +150,7 @@ export default function HistorialVentas() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Historial de Ventas</h1>
           <p className="text-slate-500 text-sm">Consulta las ventas registradas en el sistema.</p>
@@ -184,7 +184,7 @@ export default function HistorialVentas() {
           <LoadingSpinner fullScreen={false} text="Cargando historial..." className="py-12" />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-600">
+            <table className="min-w-[860px] w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 text-slate-800 font-semibold uppercase text-xs">
                 <tr>
                   <th className="px-6 py-4">Venta</th>

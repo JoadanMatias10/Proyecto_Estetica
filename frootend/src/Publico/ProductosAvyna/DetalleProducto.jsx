@@ -55,7 +55,7 @@ export default function DetalleProducto() {
 
   if (!prod || errorType === "not_found") {
     return (
-      <div className="card p-8 text-center min-h-[50vh] flex flex-col justify-center items-center">
+      <div className="card min-h-[50vh] p-4 text-center flex flex-col justify-center items-center sm:p-8">
         <h1 className="text-2xl font-bold text-slate-800 mb-4">Producto no encontrado</h1>
         <Link to="/productos" className="text-violet-600 hover:text-violet-700 font-medium underline">Volver al catalogo</Link>
       </div>

@@ -24,6 +24,17 @@ function canClientModifyAppointment(appointment) {
   return ["pendiente", "programada", "confirmada"].includes(String(appointment?.estado || "").toLowerCase());
 }
 
+function paymentStatusClass(status) {
+  if (status === "Pagado") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (status === "Pendiente") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (status === "Rechazado") return "border-red-200 bg-red-50 text-red-700";
+  return "border-slate-200 bg-slate-50 text-slate-600";
+}
+
+function hasActivePayment(appointment) {
+  return ["Pendiente", "Pagado"].includes(appointment?.estatusPago || "Sin pago");
+}
+
 export default function AgendarCancelarCitas() {
   const [searchParams] = useSearchParams();
   const serviceIdFromUrl = searchParams.get("serviceId") || "";
@@ -210,7 +221,7 @@ export default function AgendarCancelarCitas() {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
-        <form onSubmit={handleSchedule} className="card p-8">
+        <form onSubmit={handleSchedule} className="card p-4 sm:p-8">
           <h3 className="section-title border-b border-slate-100 pb-2 mb-4">Agendar nueva cita</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="md:col-span-2">
@@ -327,23 +338,45 @@ export default function AgendarCancelarCitas() {
                       <div className="mt-1 text-sm text-slate-500">{formatDateTime(appointment.fechaHora)}</div>
                       {appointment.notas && <div className="mt-1 text-xs text-slate-400">{appointment.notas}</div>}
                     </div>
-                    <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-bold ${statusClass(appointment.estado)}`}>
-                      {appointment.estado}
-                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusClass(appointment.estado)}`}>
+                        {appointment.estado}
+                      </span>
+                      <span className={`rounded-md border px-2 py-1 text-xs font-bold ${paymentStatusClass(appointment.estatusPago)}`}>
+                        Pago: {appointment.estatusPago || "Sin pago"}
+                      </span>
+                    </div>
                   </div>
-                  <div className="mt-4 flex gap-3">
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <Link to={`/cliente/citas/reprogramar?appointmentId=${encodeURIComponent(appointment.id)}`} className="w-full">
                       <Button variant="outline" className="w-full py-2 rounded-xl border-2 text-sm">Reprogramar</Button>
                     </Link>
-                    <Button
-                      type="button"
-                      variant="danger"
-                      onClick={() => handleCancel(appointment.id)}
-                      className="w-full py-2 rounded-xl text-sm"
-                    >
-                      Cancelar
-                    </Button>
+                    {!hasActivePayment(appointment) && (
+                      <Link
+                        to={`/cliente/servicios/pago?appointmentId=${encodeURIComponent(appointment.id)}&serviceId=${encodeURIComponent(appointment.serviceId || "")}`}
+                        className="w-full"
+                      >
+                        <Button variant="emerald" className="w-full py-2 rounded-xl text-sm">Pagar servicio</Button>
+                      </Link>
+                    )}
+                    {!hasActivePayment(appointment) && (
+                      <Button
+                        type="button"
+                        variant="danger"
+                        onClick={() => handleCancel(appointment.id)}
+                        className="w-full py-2 rounded-xl text-sm"
+                      >
+                        Cancelar
+                      </Button>
+                    )}
                   </div>
+                  {hasActivePayment(appointment) && (
+                    <p className="mt-3 text-xs font-semibold text-slate-500">
+                      {appointment.estatusPago === "Pagado"
+                        ? "Servicio pagado. La cita permanece ligada a su pago."
+                        : "Pago en revision. La cita no puede cancelarse mientras se valida."}
+                    </p>
+                  )}
                 </div>
               ))
             )}

@@ -354,7 +354,7 @@ export default function Home() {
               { title: "Productos AVYNA", desc: "Lleva el catalogo directo al inicio y empuja la venta desde la portada.", to: "/productos" },
               { title: "Promociones", desc: "Las promociones activas ahora pueden verse tanto en su pagina como en el inicio.", to: "/promociones" },
             ].map((card) => (
-              <div key={card.title} className="card card-hover p-8">
+              <div key={card.title} className="card card-hover p-4 sm:p-8">
                 <h3 className="section-title">{card.title}</h3>
                 <p className="page-subtitle mt-2 mb-5">{card.desc}</p>
                 <Link to={card.to}>

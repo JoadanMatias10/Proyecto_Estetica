@@ -58,7 +58,7 @@ function MiniCalendar({ selectedDate, onSelectDate, markedDates }) {
     `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+    <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm sm:p-5">
       {/* Controles mes */}
       <div className="flex items-center justify-between mb-4">
         <button
@@ -331,7 +331,7 @@ export default function AgendaCalendario() {
 
           {/* Resumen del día */}
           {!loading && citas.length > 0 && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-center">
                 <div className="text-2xl font-bold text-amber-700">{pendientes.length}</div>
                 <div className="text-xs font-medium text-amber-600 mt-1">Por atender</div>

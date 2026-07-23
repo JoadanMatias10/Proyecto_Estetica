@@ -36,7 +36,7 @@ export default function PerfilCliente() {
 
   return (
     <div className="space-y-5">
-      <div className="card p-8">
+      <div className="card p-4 sm:p-8">
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="page-title">Perfil del cliente</h1>

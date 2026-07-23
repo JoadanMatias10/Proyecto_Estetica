@@ -374,12 +374,12 @@ export default function CatalogoProductosAdmin() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Catalogo de Productos</h1>
           <p className="text-slate-500 text-sm">Usa categorias y marcas creadas por administrador.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             onClick={handleExportProducts}
@@ -455,7 +455,7 @@ export default function CatalogoProductosAdmin() {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-600">
+            <table className="min-w-[980px] w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 text-slate-800 font-semibold uppercase text-xs">
                 <tr>
                   <th className="px-6 py-4">Producto</th>
@@ -538,7 +538,7 @@ export default function CatalogoProductosAdmin() {
         maxWidthClass={currentProduct ? "max-w-3xl" : "max-w-2xl"}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="form-label">Nombre</label>
               <input
@@ -583,7 +583,7 @@ export default function CatalogoProductosAdmin() {
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="form-label">Precio ($)</label>
               <input
@@ -610,7 +610,7 @@ export default function CatalogoProductosAdmin() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="form-label">Presentacion</label>
               <select

@@ -24,6 +24,19 @@ function Icon({ className = "", children }) {
 
 export default function SidebarIcon({ name, className = "" }) {
   switch (name) {
+    case "menu":
+      return (
+        <Icon className={className}>
+          <path d="M4 6h16M4 12h16M4 18h16" />
+        </Icon>
+      );
+
+    case "close":
+      return (
+        <Icon className={className}>
+          <path d="m6 6 12 12M18 6 6 18" />
+        </Icon>
+      );
 
     /* ── Navigation / General ─────────────────────────────────────── */
 
