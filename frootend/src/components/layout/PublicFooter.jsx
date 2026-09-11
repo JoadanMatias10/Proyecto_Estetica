@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchPublicCompanyInfo } from "../../utils/publicCatalogApi";
 import SidebarIcon from "../ui/SidebarIcon";
-import Logo from "../../img/Logo para una estéti.png";
+import Logo from "../../img/logo-panamericana-192.png";
 
 function normalizeExternalUrl(value) {
   const url = String(value || "").trim();
@@ -94,7 +94,7 @@ export default function PublicFooter() {
         <div>
           <div className="flex items-center gap-3 mb-4">
             <div className="h-14 w-14 overflow-hidden rounded-2xl border border-white/70 bg-white shadow-md ring-4 ring-white/60">
-              <img src={Logo} alt={`Logo de ${businessName}`} className="h-full w-full object-cover" />
+              <img src={Logo} alt={`Logo de ${businessName}`} width={192} height={192} className="h-full w-full object-cover" />
             </div>
             <div className="min-w-0">
               <span className="block font-bold text-xl page-title leading-tight">{businessName}</span>

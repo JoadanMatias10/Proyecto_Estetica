@@ -1,8 +1,53 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { endpoints, requestJson } from "../../api";
+import { buildCloudinaryImageUrl, buildCloudinarySrcSet } from "../../utils/cloudinaryImage";
 
 const CAROUSEL_CACHE_KEY = "public.home.carousel.cache.v1";
+const HERO_MOBILE_VARIANTS = [
+  { width: 480, height: 747 },
+  { width: 768, height: 1195 },
+  { width: 960, height: 1493 },
+];
+const HERO_DESKTOP_VARIANTS = [
+  { width: 960, height: 540 },
+  { width: 1280, height: 720 },
+  { width: 1600, height: 900 },
+  { width: 1920, height: 1080 },
+];
+
+function buildHeroImageSources(imageUrl) {
+  // Keep the same centered crop that the previous object-center image used.
+  const sharedOptions = { crop: "fill", gravity: "center" };
+
+  return {
+    fallbackSrc: buildCloudinaryImageUrl(imageUrl, {
+      ...sharedOptions,
+      width: 1280,
+      height: 720,
+    }),
+    mobileFallbackSrc: buildCloudinaryImageUrl(imageUrl, {
+      ...sharedOptions,
+      width: 768,
+      height: 1195,
+    }),
+    mobileSrcSet: buildCloudinarySrcSet(imageUrl, HERO_MOBILE_VARIANTS, sharedOptions),
+    desktopSrcSet: buildCloudinarySrcSet(imageUrl, HERO_DESKTOP_VARIANTS, sharedOptions),
+  };
+}
+
+function restoreOriginalImage(event, originalSource) {
+  const image = event.currentTarget;
+  if (!originalSource || image.dataset.originalFallback === "true") return false;
+
+  image.dataset.originalFallback = "true";
+  image.parentElement?.querySelectorAll("source").forEach((source) => {
+    source.removeAttribute("srcset");
+  });
+  image.removeAttribute("srcset");
+  image.src = originalSource;
+  return true;
+}
 
 function readCachedSlides() {
   if (typeof window === "undefined") return [];
@@ -43,6 +88,15 @@ export default function Carousel({ className = "", overlay = null }) {
     if (currentIndex >= slides.length) return 0;
     return currentIndex;
   }, [currentIndex, hasSlides, slides.length]);
+  const currentSlide = hasSlides ? slides[activeIndex] : null;
+  const currentImageSources = useMemo(
+    () => buildHeroImageSources(currentSlide?.image),
+    [currentSlide?.image]
+  );
+  const markImageAsReady = useCallback((imageUrl) => {
+    if (!imageUrl) return;
+    setLoadedImages((prev) => (prev[imageUrl] ? prev : { ...prev, [imageUrl]: true }));
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -83,42 +137,6 @@ export default function Carousel({ className = "", overlay = null }) {
   }, []);
 
   useEffect(() => {
-    if (!slides.length || typeof Image === "undefined") return undefined;
-
-    let isCancelled = false;
-    const preloaders = [];
-
-    slides.forEach((slide) => {
-      const imageUrl = slide?.image;
-      if (!imageUrl) return;
-
-      const preloader = new Image();
-      const markAsReady = () => {
-        if (isCancelled) return;
-        setLoadedImages((prev) => (prev[imageUrl] ? prev : { ...prev, [imageUrl]: true }));
-      };
-
-      preloader.onload = markAsReady;
-      preloader.onerror = markAsReady;
-      preloader.src = imageUrl;
-
-      if (preloader.complete) {
-        markAsReady();
-      }
-
-      preloaders.push(preloader);
-    });
-
-    return () => {
-      isCancelled = true;
-      preloaders.forEach((preloader) => {
-        preloader.onload = null;
-        preloader.onerror = null;
-      });
-    };
-  }, [slides]);
-
-  useEffect(() => {
     if (slides.length <= 1) return undefined;
 
     const timer = setInterval(() => {
@@ -155,9 +173,82 @@ export default function Carousel({ className = "", overlay = null }) {
 
   const swipeConfidenceThreshold = 10000;
   const swipePower = (offset, velocity) => Math.abs(offset) * velocity;
-  const currentSlide = hasSlides ? slides[activeIndex] : null;
   const currentSlideReady = !currentSlide?.image || Boolean(loadedImages[currentSlide.image]);
   const showLoadingSurface = loading || (hasSlides && !currentSlideReady);
+
+  useEffect(() => {
+    if (
+      !currentSlideReady ||
+      slides.length <= 1 ||
+      typeof Image === "undefined"
+    ) {
+      return undefined;
+    }
+
+    const nextSlide = slides[(activeIndex + 1) % slides.length];
+    const nextImageUrl = nextSlide?.image;
+    if (!nextImageUrl || loadedImages[nextImageUrl]) return undefined;
+
+    let isCancelled = false;
+    let idleId = null;
+    let timeoutId = null;
+    let preloader = null;
+
+    const preloadNextSlide = () => {
+      if (isCancelled) return;
+
+      const sources = buildHeroImageSources(nextImageUrl);
+      const useMobileSource = window.matchMedia?.("(max-width: 767px)")?.matches;
+      const selectedSrcSet = useMobileSource ? sources.mobileSrcSet : sources.desktopSrcSet;
+      const selectedFallback = useMobileSource ? sources.mobileFallbackSrc : sources.fallbackSrc;
+      let isUsingOriginalFallback = false;
+
+      preloader = new Image();
+      preloader.decoding = "async";
+      preloader.fetchPriority = "low";
+      preloader.sizes = "100vw";
+      if (selectedSrcSet) preloader.srcset = selectedSrcSet;
+
+      const markAsReady = () => {
+        if (!isCancelled) markImageAsReady(nextImageUrl);
+      };
+
+      preloader.onload = markAsReady;
+      preloader.onerror = () => {
+        if (
+          !isCancelled &&
+          !isUsingOriginalFallback &&
+          selectedFallback !== nextImageUrl
+        ) {
+          isUsingOriginalFallback = true;
+          preloader.removeAttribute("srcset");
+          preloader.src = nextImageUrl;
+          return;
+        }
+
+        markAsReady();
+      };
+      preloader.src = selectedFallback;
+
+      if (preloader.complete) markAsReady();
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(preloadNextSlide, { timeout: 1500 });
+    } else {
+      timeoutId = window.setTimeout(preloadNextSlide, 250);
+    }
+
+    return () => {
+      isCancelled = true;
+      if (idleId !== null) window.cancelIdleCallback?.(idleId);
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      if (preloader) {
+        preloader.onload = null;
+        preloader.onerror = null;
+      }
+    };
+  }, [activeIndex, currentSlideReady, loadedImages, markImageAsReady, slides]);
 
   return (
     <div className={`relative isolate h-full w-full overflow-hidden bg-slate-950 ${className}`}>
@@ -192,15 +283,40 @@ export default function Carousel({ className = "", overlay = null }) {
             }`}
           >
             {currentSlide?.image ? (
-              <img
-                src={currentSlide.image}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover object-center"
-                loading="eager"
-                fetchPriority="high"
-                decoding="async"
-                draggable="false"
-              />
+              <picture className="absolute inset-0 block h-full w-full">
+                {currentImageSources.mobileSrcSet ? (
+                  <source
+                    media="(max-width: 767px)"
+                    srcSet={currentImageSources.mobileSrcSet}
+                    sizes="100vw"
+                  />
+                ) : null}
+                {currentImageSources.desktopSrcSet ? (
+                  <source
+                    media="(min-width: 768px)"
+                    srcSet={currentImageSources.desktopSrcSet}
+                    sizes="100vw"
+                  />
+                ) : null}
+                <img
+                  src={currentImageSources.fallbackSrc}
+                  alt=""
+                  width="1600"
+                  height="900"
+                  sizes="100vw"
+                  className="h-full w-full object-cover object-center"
+                  loading="eager"
+                  fetchPriority="high"
+                  decoding="async"
+                  draggable="false"
+                  onLoad={() => markImageAsReady(currentSlide.image)}
+                  onError={(event) => {
+                    if (!restoreOriginalImage(event, currentSlide.image)) {
+                      markImageAsReady(currentSlide.image);
+                    }
+                  }}
+                />
+              </picture>
             ) : (
               <div className="absolute inset-0 h-full w-full bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900" />
             )}

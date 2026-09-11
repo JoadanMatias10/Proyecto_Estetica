@@ -4,13 +4,18 @@ import { Link } from "react-router-dom";
 import Button from "../components/ui/Button";
 import Carousel from "../components/ui/Carousel";
 import {
+  fetchPublicHomeHighlights,
   fetchPublicProductsBundle,
   fetchPublicPromotions,
   fetchPublicServicesBundle,
 } from "../utils/publicCatalogApi";
+import { buildCloudinaryImageUrl, buildCloudinarySrcSet } from "../utils/cloudinaryImage";
 import { formatProductPresentation } from "../utils/productPresentation";
 
 const HOME_HIGHLIGHTS_STORAGE_KEY = "admin.home.highlights.v1";
+const CARD_IMAGE_WIDTHS = [360, 640, 800];
+const CARD_IMAGE_SIZES =
+  "(min-width: 1280px) 300px, (min-width: 640px) calc(50vw - 24px), calc(100vw - 32px)";
 
 function truncateText(value, maxLength = 110) {
   const normalized = String(value || "").trim();
@@ -65,6 +70,54 @@ function getHomeHighlights(items, storedIds) {
     .slice(0, 4);
 }
 
+function isLegacyHighlightsFallbackError(error) {
+  const status = Number(error?.status);
+  return status === 404 || status === 405 || status === 501;
+}
+
+async function fetchLegacyHomeHighlights() {
+  const storedHighlights = readStoredHighlights();
+  const [servicesResult, productsResult, promotionsResult] = await Promise.allSettled([
+    fetchPublicServicesBundle(),
+    fetchPublicProductsBundle(),
+    fetchPublicPromotions(),
+  ]);
+
+  const publicServices = servicesResult.status === "fulfilled"
+    ? (servicesResult.value.services || [])
+    : [];
+  const publicProducts = productsResult.status === "fulfilled"
+    ? (productsResult.value.products || [])
+    : [];
+  const publicPromotions = promotionsResult.status === "fulfilled"
+    ? (promotionsResult.value || [])
+    : [];
+
+  return {
+    services: getHomeHighlights(publicServices, storedHighlights.services),
+    products: getHomeHighlights(publicProducts, storedHighlights.products),
+    promotions: getHomeHighlights(publicPromotions, storedHighlights.promotions),
+  };
+}
+
+function buildCardImageSources(imageUrl) {
+  return {
+    src: buildCloudinaryImageUrl(imageUrl, { crop: "limit", width: 800 }),
+    srcSet: buildCloudinarySrcSet(imageUrl, CARD_IMAGE_WIDTHS, { crop: "limit" }),
+  };
+}
+
+function restoreOriginalImage(event) {
+  const image = event.currentTarget;
+  const originalSource = image.dataset.originalSrc;
+
+  if (!originalSource || image.dataset.originalFallback === "true") return;
+
+  image.dataset.originalFallback = "true";
+  image.removeAttribute("srcset");
+  image.src = originalSource;
+}
+
 function SectionHeader({ title, subtitle, ctaLabel, ctaTo }) {
   return (
     <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -94,34 +147,20 @@ export default function Home() {
 
     const loadHighlights = async () => {
       try {
-        const storedHighlights = readStoredHighlights();
-        const [servicesResult, productsResult, promotionsResult] = await Promise.allSettled([
-          fetchPublicServicesBundle(),
-          fetchPublicProductsBundle(),
-          fetchPublicPromotions(),
-        ]);
+        let nextHighlights;
+
+        try {
+          nextHighlights = await fetchPublicHomeHighlights();
+        } catch (error) {
+          if (!isLegacyHighlightsFallbackError(error)) throw error;
+          nextHighlights = await fetchLegacyHomeHighlights();
+        }
 
         if (!isMounted) return;
 
-        const publicServices = servicesResult.status === "fulfilled"
-          ? (servicesResult.value.services || [])
-          : [];
-        const publicProducts = productsResult.status === "fulfilled"
-          ? (productsResult.value.products || [])
-          : [];
-        const publicPromotions = promotionsResult.status === "fulfilled"
-          ? (promotionsResult.value || [])
-          : [];
-
-        setServices(
-          getHomeHighlights(publicServices, storedHighlights.services)
-        );
-        setProducts(
-          getHomeHighlights(publicProducts, storedHighlights.products)
-        );
-        setPromotions(
-          getHomeHighlights(publicPromotions, storedHighlights.promotions)
-        );
+        setServices((nextHighlights.services || []).slice(0, 4));
+        setProducts((nextHighlights.products || []).slice(0, 4));
+        setPromotions((nextHighlights.promotions || []).slice(0, 4));
       } catch (_error) {
         if (!isMounted) return;
         setServices([]);
@@ -255,36 +294,49 @@ export default function Home() {
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-                {services.map((service) => (
-                  <div
-                    key={service.id}
-                    className="card hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-3xl overflow-hidden flex flex-col h-full border border-slate-100/70"
-                  >
-                    <div className="h-64 sm:h-72 bg-gradient-to-br from-violet-50 to-rose-50 overflow-hidden">
-                      <img
-                        src={service.imagen || `https://placehold.co/800x500/F5F3FF/7C3AED?text=${encodeURIComponent(service.nombre || "Servicio")}`}
-                        alt={service.nombre}
-                        className="h-full w-full object-cover transition-transform duration-700 hover:scale-105"
-                      />
-                    </div>
+                {services.map((service) => {
+                  const imageUrl = service.imagen || `https://placehold.co/800x500/F5F3FF/7C3AED?text=${encodeURIComponent(service.nombre || "Servicio")}`;
+                  const imageSources = buildCardImageSources(imageUrl);
 
-                    <div className="flex flex-1 flex-col justify-between p-5">
-                      <h3 className="text-xl font-bold text-slate-800">{service.nombre}</h3>
-                      <div className="mt-2 text-slate-500 font-medium">
-                        <span className="font-bold text-rose-600 text-xl">${Number(service.precio || 0).toFixed(2)}</span>{" "}
-                        <span className="text-xs">MXN</span>
+                  return (
+                    <div
+                      key={service.id}
+                      className="card hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-3xl overflow-hidden flex flex-col h-full border border-slate-100/70"
+                    >
+                      <div className="h-64 sm:h-72 bg-gradient-to-br from-violet-50 to-rose-50 overflow-hidden">
+                        <img
+                          src={imageSources.src}
+                          srcSet={imageSources.srcSet || undefined}
+                          sizes={CARD_IMAGE_SIZES}
+                          width={800}
+                          height={600}
+                          loading="lazy"
+                          decoding="async"
+                          data-original-src={imageUrl}
+                          onError={restoreOriginalImage}
+                          alt={service.nombre}
+                          className="h-full w-full object-cover transition-transform duration-700 hover:scale-105"
+                        />
                       </div>
 
-                      <div className="mt-5">
-                        <Link to={`/servicios/${service.id}`}>
-                          <Button variant="outline" className="w-full py-2.5">
-                            Ver detalle
-                          </Button>
-                        </Link>
+                      <div className="flex flex-1 flex-col justify-between p-5">
+                        <h3 className="text-xl font-bold text-slate-800">{service.nombre}</h3>
+                        <div className="mt-2 text-slate-500 font-medium">
+                          <span className="font-bold text-rose-600 text-xl">${Number(service.precio || 0).toFixed(2)}</span>{" "}
+                          <span className="text-xs">MXN</span>
+                        </div>
+
+                        <div className="mt-5">
+                          <Link to={`/servicios/${service.id}`}>
+                            <Button variant="outline" className="w-full py-2.5">
+                              Ver detalle
+                            </Button>
+                          </Link>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           ) : null}
@@ -300,6 +352,8 @@ export default function Home() {
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
                 {products.map((product) => {
                   const presentation = formatProductPresentation(product);
+                  const imageUrl = product.imagen || "https://placehold.co/600x400/EDE9FE/7C3AED?text=AVYNA";
+                  const imageSources = buildCardImageSources(imageUrl);
 
                   return (
                     <motion.div
@@ -309,7 +363,15 @@ export default function Home() {
                     >
                       <div className="h-64 sm:h-72 bg-gradient-to-br from-violet-100 to-rose-100 flex items-center justify-center relative overflow-hidden">
                         <img
-                          src={product.imagen || "https://placehold.co/600x400/EDE9FE/7C3AED?text=AVYNA"}
+                          src={imageSources.src}
+                          srcSet={imageSources.srcSet || undefined}
+                          sizes={CARD_IMAGE_SIZES}
+                          width={800}
+                          height={600}
+                          loading="lazy"
+                          decoding="async"
+                          data-original-src={imageUrl}
+                          onError={restoreOriginalImage}
                           alt={product.nombre}
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                         />

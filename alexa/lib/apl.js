@@ -216,6 +216,10 @@ function appointmentData(draft = {}, prompt = '', options = [], availabilityText
     const authDigits = String(draft.authDigits || '').replace(/\D/g, '').slice(0, authMode === 'code' ? 6 : 10);
     const authTargetLength = authMode === 'code' ? 6 : 10;
     const authDisplay = authDigits || (authMode === 'code' ? 'Código de 6 dígitos' : 'Teléfono de 10 dígitos');
+    const authBaseTitle = authMode === 'code' ? 'Código de verificación' : 'Teléfono registrado';
+    const authStatus = authMode && authDigits
+        ? `Capturado: ${authDigits} (${authDigits.length}/${authTargetLength})`
+        : draft.status || '';
 
     return {
         brand: 'ESTÉTICA PANAMERICANA',
@@ -224,13 +228,13 @@ function appointmentData(draft = {}, prompt = '', options = [], availabilityText
             ? 'Guardamos los datos de tu solicitud.'
             : 'Te guiaré paso a paso. Puedes responder usando tu voz o tocando la pantalla.',
         prompt,
-        status: draft.status || '',
+        status: authStatus,
         complete: Boolean(draft.complete),
         availabilityText,
         summaryText: availabilityText ? `${summaryText}\n\n${availabilityText}` : summaryText,
         authMode: Boolean(authMode),
         authKind: authMode,
-        authTitle: authMode === 'code' ? 'Código de verificación' : 'Teléfono registrado',
+        authTitle: authDigits ? `${authBaseTitle}: ${authDigits}` : authBaseTitle,
         authInstruction: authMode === 'code'
             ? 'Toca el código de 6 dígitos que llegó a tu correo.'
             : 'Toca tu teléfono registrado de 10 dígitos o dilo por voz.',

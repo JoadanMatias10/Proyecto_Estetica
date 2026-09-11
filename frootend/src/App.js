@@ -24,7 +24,7 @@ function App() {
 
 export default App;*/
 
-import React from "react";
+import React, { Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 
 import PublicLayout from "./components/layout/PublicLayout";
@@ -33,98 +33,112 @@ import PublicLayout from "./components/layout/PublicLayout";
 import Home from "./Publico/Home";
 
 // Productos AVYNA
-import Catalogo from "./Publico/ProductosAvyna/Catalogo";
-import DetalleProducto from "./Publico/ProductosAvyna/DetalleProducto";
-import Promociones from "./Publico/ProductosAvyna/Promociones";
+const Catalogo = React.lazy(() => import("./Publico/ProductosAvyna/Catalogo"));
+const DetalleProducto = React.lazy(() => import("./Publico/ProductosAvyna/DetalleProducto"));
+const Promociones = React.lazy(() => import("./Publico/ProductosAvyna/Promociones"));
 
 // Login
-import InicioSesion from "./Publico/Login/InicioSesion";
-import Registro from "./Publico/Login/Registro";
-import Recuperacion from "./Publico/Login/Recuperacion";
-import ConfigurarAccesoCuenta from "./Publico/Login/ConfigurarAccesoCuenta";
+const InicioSesion = React.lazy(() => import("./Publico/Login/InicioSesion"));
+const Registro = React.lazy(() => import("./Publico/Login/Registro"));
+const Recuperacion = React.lazy(() => import("./Publico/Login/Recuperacion"));
+const ConfigurarAccesoCuenta = React.lazy(() => import("./Publico/Login/ConfigurarAccesoCuenta"));
 
 // Servicios
-import ConsultaServicio from "./Publico/Servicios/ConsultaServicio";
-import DetalleServicio from "./Publico/Servicios/DetalleServicio";
+const ConsultaServicio = React.lazy(() => import("./Publico/Servicios/ConsultaServicio"));
+const DetalleServicio = React.lazy(() => import("./Publico/Servicios/DetalleServicio"));
 
 // Información de la empresa
-import Contactos from "./Publico/InformacionEmpresa/Contactos";
-import QuienesSomos from "./Publico/InformacionEmpresa/QuienesSomos";
-import MisionVisionValores from "./Publico/InformacionEmpresa/MisionVisionValores";
-import RedesSociales from "./Publico/InformacionEmpresa/RedesSociales";
-import PoliticaPrivacidad from "./Publico/InformacionEmpresa/PoliticaPrivacidad";
+const Contactos = React.lazy(() => import("./Publico/InformacionEmpresa/Contactos"));
+const QuienesSomos = React.lazy(() => import("./Publico/InformacionEmpresa/QuienesSomos"));
+const MisionVisionValores = React.lazy(() => import("./Publico/InformacionEmpresa/MisionVisionValores"));
+const RedesSociales = React.lazy(() => import("./Publico/InformacionEmpresa/RedesSociales"));
+const PoliticaPrivacidad = React.lazy(() => import("./Publico/InformacionEmpresa/PoliticaPrivacidad"));
 
-import ErrorPage from "./Publico/Error/ErrorPage";
+const ErrorPage = React.lazy(() => import("./Publico/Error/ErrorPage"));
 
 //RUTAS DEL CLIENTE 
-import ClientLayout from "./components/layout/ClientLayout";
+const ClientLayout = React.lazy(() => import("./components/layout/ClientLayout"));
 
-import DashboardCliente from "./Cliente/DashboardCliente";
+const DashboardCliente = React.lazy(() => import("./Cliente/DashboardCliente"));
 
-import CatalogoProductos from "./Cliente/ProductosAvyna/CatalogoProductos";
-import DetalleProductoCliente from "./Cliente/ProductosAvyna/DetalleProductoCliente";
-import PagoProducto from "./Cliente/ProductosAvyna/PagoProducto";
-import CarritoCompra from "./Cliente/ProductosAvyna/CarritoCompra";
-import EstadoCarrito from "./Cliente/ProductosAvyna/EstadoCarrito";
+const CatalogoProductos = React.lazy(() => import("./Cliente/ProductosAvyna/CatalogoProductos"));
+const DetalleProductoCliente = React.lazy(() => import("./Cliente/ProductosAvyna/DetalleProductoCliente"));
+const PagoProducto = React.lazy(() => import("./Cliente/ProductosAvyna/PagoProducto"));
+const CarritoCompra = React.lazy(() => import("./Cliente/ProductosAvyna/CarritoCompra"));
+const EstadoCarrito = React.lazy(() => import("./Cliente/ProductosAvyna/EstadoCarrito"));
 
-import AgendarCancelarCitas from "./Cliente/Citas/AgendarCancelarCitas";
-import ReprogramarCita from "./Cliente/Citas/ReprogramarCita";
-import CalendarioDisponibilidad from "./Cliente/Citas/CalendarioDisponibilidad";
+const AgendarCancelarCitas = React.lazy(() => import("./Cliente/Citas/AgendarCancelarCitas"));
+const ReprogramarCita = React.lazy(() => import("./Cliente/Citas/ReprogramarCita"));
+const CalendarioDisponibilidad = React.lazy(() => import("./Cliente/Citas/CalendarioDisponibilidad"));
 
-import ConsultaServicioCliente from "./Cliente/Servicios/ConsultaServicioCliente";
-import DetalleServicioCliente from "./Cliente/Servicios/DetalleServicioCliente";
-import PagoServicios from "./Cliente/Servicios/PagoServicios";
+const ConsultaServicioCliente = React.lazy(() => import("./Cliente/Servicios/ConsultaServicioCliente"));
+const DetalleServicioCliente = React.lazy(() => import("./Cliente/Servicios/DetalleServicioCliente"));
+const PagoServicios = React.lazy(() => import("./Cliente/Servicios/PagoServicios"));
 
-import RecordarCita from "./Cliente/Notificaciones/RecordarCita";
-import NotificarCitas from "./Cliente/Notificaciones/NotificarCitas";
+const RecordarCita = React.lazy(() => import("./Cliente/Notificaciones/RecordarCita"));
+const NotificarCitas = React.lazy(() => import("./Cliente/Notificaciones/NotificarCitas"));
 
-import HistorialPago from "./Cliente/Pagos/HistorialPago";
+const HistorialPago = React.lazy(() => import("./Cliente/Pagos/HistorialPago"));
 
-import PerfilCliente from "./Cliente/Perfil/PerfilCliente";
-import InformacionCliente from "./Cliente/Perfil/InformacionCliente";
-import NotificacionesCliente from "./Cliente/Perfil/NotificacionesCliente";
+const PerfilCliente = React.lazy(() => import("./Cliente/Perfil/PerfilCliente"));
+const InformacionCliente = React.lazy(() => import("./Cliente/Perfil/InformacionCliente"));
+const NotificacionesCliente = React.lazy(() => import("./Cliente/Perfil/NotificacionesCliente"));
 
 
 
 
 // Estilista
-import EstilistaLayout from "./components/layout/EstilistaLayout";
-import DashboardEstilista from "./Estilista/DashboardEstilista";
-import CitasAsignadas from "./Estilista/CitasAsignadas";
-import ServiciosRealizados from "./Estilista/ServiciosRealizados";
-import AgendaCalendario from "./Estilista/AgendaCalendario";
-import HorarioTrabajo from "./Estilista/HorarioTrabajo";
-import NotificacionesEstilista from "./Estilista/NotificacionesEstilista";
+const EstilistaLayout = React.lazy(() => import("./components/layout/EstilistaLayout"));
+const DashboardEstilista = React.lazy(() => import("./Estilista/DashboardEstilista"));
+const CitasAsignadas = React.lazy(() => import("./Estilista/CitasAsignadas"));
+const ServiciosRealizados = React.lazy(() => import("./Estilista/ServiciosRealizados"));
+const AgendaCalendario = React.lazy(() => import("./Estilista/AgendaCalendario"));
+const HorarioTrabajo = React.lazy(() => import("./Estilista/HorarioTrabajo"));
+const NotificacionesEstilista = React.lazy(() => import("./Estilista/NotificacionesEstilista"));
 
 // Admin
-import AdminLayout from "./components/layout/AdminLayout";
-import DashboardAdmin from "./Administrador/DashboardAdmin";
-import GestionServicios from "./Administrador/Servicios/GestionServicios";
-import PromocionesAdmin from "./Administrador/Servicios/Promociones";
-import CatalogoProductosAdmin from "./Administrador/Productos/CatalogoProductosAdmin";
-import CategoriasProductos from "./Administrador/Productos/CategoriasProductos";
-import MarcasProductos from "./Administrador/Productos/MarcasProductos";
-import RegistrarVenta from "./Administrador/Ventas/RegistrarVenta";
-import HistorialVentas from "./Administrador/Ventas/HistorialVentas";
-import PagosTransferencia from "./Administrador/Pagos/PagosTransferencia";
-import GestionPersonal from "./Administrador/Personal/GestionPersonal";
-import GenerarReportes from "./Administrador/Reportes/GenerarReportes";
-import InformesEstadisticos from "./Administrador/Reportes/InformesEstadisticos";
-import ModeloPredictivo from "./Administrador/Reportes/ModeloPredictivo";
-import ClasificacionCitas from "./Administrador/Reportes/ClasificacionCitas";
-import RegresionDemanda from "./Administrador/Reportes/RegresionDemanda";
-import RecomendacionServicios from "./Administrador/Reportes/RecomendacionServicios";
-import InformacionEmpresa from "./Administrador/Empresa/InformacionEmpresa";
-import ControlStock from "./Administrador/Inventario/ControlStock";
-import CategoriasServicios from "./Administrador/Servicios/CategoriasServicios";
-import GestionCarrusel from "./Administrador/Marketing/GestionCarrusel";
-import GestionDestacadosInicio from "./Administrador/Marketing/GestionDestacadosInicio";
-import GestionRespaldos from "./Administrador/Respaldos/GestionRespaldos";
-import MonitoreoBD from "./Administrador/Monitoreo/MonitoreoBD";
+const AdminLayout = React.lazy(() => import("./components/layout/AdminLayout"));
+const DashboardAdmin = React.lazy(() => import("./Administrador/DashboardAdmin"));
+const GestionServicios = React.lazy(() => import("./Administrador/Servicios/GestionServicios"));
+const PromocionesAdmin = React.lazy(() => import("./Administrador/Servicios/Promociones"));
+const CatalogoProductosAdmin = React.lazy(() => import("./Administrador/Productos/CatalogoProductosAdmin"));
+const CategoriasProductos = React.lazy(() => import("./Administrador/Productos/CategoriasProductos"));
+const MarcasProductos = React.lazy(() => import("./Administrador/Productos/MarcasProductos"));
+const RegistrarVenta = React.lazy(() => import("./Administrador/Ventas/RegistrarVenta"));
+const HistorialVentas = React.lazy(() => import("./Administrador/Ventas/HistorialVentas"));
+const PagosTransferencia = React.lazy(() => import("./Administrador/Pagos/PagosTransferencia"));
+const GestionPersonal = React.lazy(() => import("./Administrador/Personal/GestionPersonal"));
+const GenerarReportes = React.lazy(() => import("./Administrador/Reportes/GenerarReportes"));
+const InformesEstadisticos = React.lazy(() => import("./Administrador/Reportes/InformesEstadisticos"));
+const ModeloPredictivo = React.lazy(() => import("./Administrador/Reportes/ModeloPredictivo"));
+const ClasificacionCitas = React.lazy(() => import("./Administrador/Reportes/ClasificacionCitas"));
+const RegresionDemanda = React.lazy(() => import("./Administrador/Reportes/RegresionDemanda"));
+const RecomendacionServicios = React.lazy(() => import("./Administrador/Reportes/RecomendacionServicios"));
+const InformacionEmpresa = React.lazy(() => import("./Administrador/Empresa/InformacionEmpresa"));
+const ControlStock = React.lazy(() => import("./Administrador/Inventario/ControlStock"));
+const CategoriasServicios = React.lazy(() => import("./Administrador/Servicios/CategoriasServicios"));
+const GestionCarrusel = React.lazy(() => import("./Administrador/Marketing/GestionCarrusel"));
+const GestionDestacadosInicio = React.lazy(() => import("./Administrador/Marketing/GestionDestacadosInicio"));
+const GestionRespaldos = React.lazy(() => import("./Administrador/Respaldos/GestionRespaldos"));
+const MonitoreoBD = React.lazy(() => import("./Administrador/Monitoreo/MonitoreoBD"));
+
+function RouteLoadingFallback() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      className="flex min-h-[40vh] items-center justify-center px-4 text-center text-sm font-medium text-slate-600"
+    >
+      Cargando página...
+    </div>
+  );
+}
 
 export default function App() {
   return (
-    <Routes>
+    <Suspense fallback={<RouteLoadingFallback />}>
+      <Routes>
       <Route element={<PublicLayout />}>
         <Route path="/" element={<Home />} />
 
@@ -219,7 +233,8 @@ export default function App() {
         <Route path="respaldos" element={<GestionRespaldos />} />
         <Route path="monitoreo" element={<MonitoreoBD />} />
       </Route>
-    </Routes>
+      </Routes>
+    </Suspense>
 
   );
 

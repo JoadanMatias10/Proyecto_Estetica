@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
 import Button from "../ui/Button";
 import ThemeToggle from "../ui/ThemeToggle";
-import Logo from "../../img/Logo para una estéti.png";
+import Logo from "../../img/logo-panamericana-192.png";
 import MobileMenuButton from "./MobileMenuButton";
 
 const linkBase =
@@ -31,7 +31,7 @@ export default function PublicHeader() {
       <nav className="mx-auto flex min-h-16 max-w-[1640px] items-center justify-between gap-3 px-3 py-2 sm:min-h-20 sm:px-4 md:px-6 xl:px-8">
         <Link to="/" className="flex min-w-0 items-center gap-2 sm:gap-3">
           <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg shadow-md transition-all duration-300 hover:scale-105 hover:shadow-lg sm:h-12 sm:w-12 xl:h-14 xl:w-14">
-            <img src={Logo} alt="Logo Estética" className="h-full w-full object-cover" />
+            <img src={Logo} alt="Logo Estética" width={192} height={192} className="h-full w-full object-cover" />
           </div>
           <div className="min-w-0 max-[390px]:hidden">
             <h1 className="whitespace-nowrap bg-gradient-to-r from-rose-500 to-violet-600 bg-clip-text text-base font-bold leading-none text-transparent sm:text-xl xl:text-2xl">

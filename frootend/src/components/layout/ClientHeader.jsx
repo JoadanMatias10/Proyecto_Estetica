@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Logo from "../../img/Logo para una estéti.png";
+import Logo from "../../img/logo-panamericana-192.png";
 import ThemeToggle from "../ui/ThemeToggle";
 import { getStoredClientUser } from "../../utils/clientStore";
 import MobileMenuButton from "./MobileMenuButton";
@@ -43,7 +43,7 @@ export default function ClientHeader({ isMenuOpen = false, onMenuToggle }) {
             className="md:hidden"
           />
           <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg shadow-md sm:h-10 sm:w-10">
-            <img src={Logo} alt="Logo" className="w-full h-full object-cover" />
+            <img src={Logo} alt="Logo" width={192} height={192} className="w-full h-full object-cover" />
           </div>
           <div className="min-w-0 leading-tight max-[420px]:hidden">
             <div className="truncate text-sm font-bold bg-gradient-to-r from-rose-600 to-rose-500 bg-clip-text text-transparent sm:text-base">Estética Panamericana</div>
