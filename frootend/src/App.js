@@ -30,7 +30,12 @@ import { Routes, Route } from "react-router-dom";
 import PublicLayout from "./components/layout/PublicLayout";
 
 // Páginas públicas
-import Home from "./Publico/Home";
+const importHome = () => import("./Publico/Home");
+const initialHomeImport =
+  typeof window !== "undefined" && window.location.pathname === "/"
+    ? importHome()
+    : null;
+const Home = React.lazy(() => initialHomeImport || importHome());
 
 // Productos AVYNA
 const Catalogo = React.lazy(() => import("./Publico/ProductosAvyna/Catalogo"));

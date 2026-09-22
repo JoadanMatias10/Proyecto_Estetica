@@ -13,9 +13,12 @@ test("keeps the complete route map after code splitting", () => {
   expect(appSource).toContain('<Route path="/admin" element={<AdminLayout />}>');
 });
 
-test("keeps the home critical and defers non-home screens", () => {
-  const lazyScreens = appSource.match(/React\.lazy\(\(\) => import\(/g) || [];
+test("preloads home only on the direct root route and defers every screen", () => {
+  const lazyScreens = appSource.match(/React\.lazy\(/g) || [];
 
-  expect(appSource).toContain('import Home from "./Publico/Home";');
-  expect(lazyScreens).toHaveLength(65);
+  expect(appSource).not.toContain('import Home from "./Publico/Home";');
+  expect(appSource).toContain('const importHome = () => import("./Publico/Home");');
+  expect(appSource).toContain('window.location.pathname === "/"');
+  expect(appSource).toContain('const Home = React.lazy(() => initialHomeImport || importHome());');
+  expect(lazyScreens).toHaveLength(66);
 });

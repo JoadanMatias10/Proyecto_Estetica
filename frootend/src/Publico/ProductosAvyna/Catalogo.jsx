@@ -1,11 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import Button from "../../components/ui/Button";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import SidebarIcon from "../../components/ui/SidebarIcon";
+import { buildCloudinaryImageUrl, buildCloudinarySrcSet } from "../../utils/cloudinaryImage";
 import { fetchPublicProductsBundle } from "../../utils/publicCatalogApi";
 import { formatProductPresentation } from "../../utils/productPresentation";
+
+const PRODUCT_IMAGE_VARIANTS = [
+  { width: 360, height: 270 },
+  { width: 640, height: 480 },
+  { width: 800, height: 600 },
+];
+const PRODUCT_IMAGE_SIZES =
+  "(min-width: 1280px) 294px, (min-width: 1024px) calc(25vw - 26px), (min-width: 640px) calc(50vw - 28px), calc(100vw - 32px)";
 
 export default function Catalogo() {
   const [productos, setProductos] = useState([]);
@@ -164,20 +172,48 @@ export default function Catalogo() {
           {isLoading ? (
             <div className="col-span-full h-[420px]" />
           ) : filteredProductos.length > 0 ? (
-            filteredProductos.map((product) => {
+            filteredProductos.map((product, index) => {
               const presentation = formatProductPresentation(product);
+              const originalImageUrl = product.imagen || "https://placehold.co/600x400/EDE9FE/7C3AED?text=AVYNA";
+              const optimizedImageUrl = buildCloudinaryImageUrl(originalImageUrl, {
+                crop: "fill",
+                gravity: "auto",
+                width: 800,
+                height: 600,
+              });
+              const optimizedImageSrcSet = buildCloudinarySrcSet(
+                originalImageUrl,
+                PRODUCT_IMAGE_VARIANTS,
+                { crop: "fill", gravity: "auto" }
+              );
+              const isFirstImage = index === 0;
 
               return (
-                <motion.div
+                <div
                   key={product.id}
-                  whileHover={{ y: -6 }}
-                  className="card hover:shadow-xl transition-shadow duration-300 rounded-2xl overflow-hidden group"
+                  className="card group overflow-hidden rounded-2xl bg-white/95 backdrop-blur-none transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl"
+                  style={{ contentVisibility: "auto", containIntrinsicSize: "440px" }}
                 >
                   <div className="h-64 sm:h-72 bg-gradient-to-br from-violet-100 to-rose-100 flex items-center justify-center relative overflow-hidden">
                     <img
-                      src={product.imagen || `https://placehold.co/600x400/EDE9FE/7C3AED?text=AVYNA`}
+                      src={optimizedImageUrl}
+                      srcSet={optimizedImageSrcSet || undefined}
+                      sizes={PRODUCT_IMAGE_SIZES}
+                      width={800}
+                      height={600}
+                      loading={isFirstImage ? "eager" : "lazy"}
+                      fetchPriority={isFirstImage ? "high" : "auto"}
+                      decoding="async"
                       alt={product.nombre}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      onError={(event) => {
+                        const image = event.currentTarget;
+                        if (image.dataset.originalFallback === "true") return;
+                        image.dataset.originalFallback = "true";
+                        image.removeAttribute("srcset");
+                        image.removeAttribute("sizes");
+                        image.src = originalImageUrl;
+                      }}
                     />
                     <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       <span className="bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold text-indigo-600 shadow-sm">
@@ -204,7 +240,7 @@ export default function Catalogo() {
                       </Link>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               );
             })
           ) : (
