@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Button from "../../components/ui/Button";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import OfflineDataNotice from "../../components/pwa/OfflineDataNotice";
 import SidebarIcon from "../../components/ui/SidebarIcon";
 import { fetchPublicServicesBundle, getServiceSubcategoriesBySegment } from "../../utils/publicCatalogApi";
 
@@ -15,6 +16,7 @@ export default function ConsultaServicio() {
   const [isLoading, setIsLoading] = useState(true);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [offlineData, setOfflineData] = useState({ active: false, cachedAt: "" });
   const filterTimerRef = useRef(null);
 
   useEffect(() => {
@@ -27,6 +29,7 @@ export default function ConsultaServicio() {
         setServiceCategories(data.serviceCategories);
         const uniqueSegments = Array.from(new Set(data.serviceSegments || []));
         setServiceSegments(uniqueSegments);
+        setOfflineData({ active: data.isOfflineFallback, cachedAt: data.cachedAt });
       } catch (error) {
         setErrorMessage(error.message || "No fue posible cargar servicios.");
       } finally {
@@ -35,6 +38,9 @@ export default function ConsultaServicio() {
     };
 
     loadData();
+
+    window.addEventListener("online", loadData);
+    return () => window.removeEventListener("online", loadData);
   }, []);
 
   useEffect(() => {
@@ -113,6 +119,8 @@ export default function ConsultaServicio() {
           <Button className="px-6 py-3 rounded-xl">Iniciar sesion para agendar</Button>
         </Link>
       </div>
+
+      {offlineData.active && <OfflineDataNotice cachedAt={offlineData.cachedAt} className="mb-6" />}
 
       <div className="flex flex-col sm:flex-row gap-4 items-center w-full md:w-auto mb-8">
         <div className="relative w-full sm:w-80">
@@ -204,7 +212,7 @@ export default function ConsultaServicio() {
               <div key={service.id} className="card hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group rounded-3xl overflow-hidden flex flex-col h-full border border-slate-100/50">
                 <div className="relative w-full h-72 overflow-hidden rounded-t-3xl bg-gradient-to-br from-violet-50 to-rose-50 group-hover:from-violet-100 group-hover:to-rose-100 transition-colors duration-500">
                   <img
-                    src={service.imagen || `https://placehold.co/1200x900/F5F3FF/7C3AED?text=${encodeURIComponent(service.nombre)}`}
+                    src={service.imagen || "/logo-panamericana-white-512.png"}
                     alt={service.nombre}
                     className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.03] opacity-100"
                     loading="lazy"

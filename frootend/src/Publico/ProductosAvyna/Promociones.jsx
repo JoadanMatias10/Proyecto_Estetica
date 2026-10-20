@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import OfflineDataNotice from "../../components/pwa/OfflineDataNotice";
 import { fetchPublicPromotions } from "../../utils/publicCatalogApi";
 
 function truncateText(value, maxLength = 160) {
@@ -13,6 +14,7 @@ export default function Promociones() {
   const [promotions, setPromotions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [offlineData, setOfflineData] = useState({ active: false, cachedAt: "" });
 
   useEffect(() => {
     let isMounted = true;
@@ -22,8 +24,11 @@ export default function Promociones() {
       setErrorMessage("");
 
       try {
-        const data = await fetchPublicPromotions();
-        if (isMounted) setPromotions(data);
+        const data = await fetchPublicPromotions({ withMeta: true });
+        if (isMounted) {
+          setPromotions(data.promotions);
+          setOfflineData({ active: data.isOfflineFallback, cachedAt: data.cachedAt });
+        }
       } catch (error) {
         if (isMounted) {
           setPromotions([]);
@@ -35,9 +40,11 @@ export default function Promociones() {
     };
 
     loadPromotions();
+    window.addEventListener("online", loadPromotions);
 
     return () => {
       isMounted = false;
+      window.removeEventListener("online", loadPromotions);
     };
   }, []);
 
@@ -49,6 +56,8 @@ export default function Promociones() {
           <p className="page-subtitle mt-2">Aqui se muestran las promociones activas.</p>
         </div>
       </div>
+
+      {offlineData.active && <OfflineDataNotice cachedAt={offlineData.cachedAt} className="mb-6" />}
 
       {errorMessage ? (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -78,7 +87,7 @@ export default function Promociones() {
                 className="rounded-3xl border border-rose-100 bg-gradient-to-br from-rose-50 via-white to-violet-50 p-7 shadow-sm"
               >
                 <span className="inline-flex rounded-full bg-rose-100 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-rose-700">
-                  Activa
+                  {offlineData.active ? "Guardada · verifica vigencia" : "Activa"}
                 </span>
                 <h2 className="mt-4 text-2xl font-bold text-slate-800">{promotion.titulo}</h2>
                 <p className="mt-4 min-h-[96px] text-slate-600 leading-7">

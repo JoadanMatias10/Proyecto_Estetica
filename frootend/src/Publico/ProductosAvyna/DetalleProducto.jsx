@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import OfflineDataNotice from "../../components/pwa/OfflineDataNotice";
 import ErrorPage from "../Error/ErrorPage";
-import { endpoints, requestJson } from "../../api";
+import { fetchPublicProductById } from "../../utils/publicCatalogApi";
 import { formatProductPresentation } from "../../utils/productPresentation";
 
 export default function DetalleProducto() {
@@ -11,6 +12,7 @@ export default function DetalleProducto() {
   const [prod, setProd] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorType, setErrorType] = useState("");
+  const [offlineData, setOfflineData] = useState({ active: false, cachedAt: "" });
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -23,8 +25,9 @@ export default function DetalleProducto() {
       setIsLoading(true);
       setErrorType("");
       try {
-        const data = await requestJson(endpoints.publicProductById(id));
+        const data = await fetchPublicProductById(id);
         setProd(data.product || null);
+        setOfflineData({ active: data.isOfflineFallback, cachedAt: data.cachedAt });
       } catch (error) {
         if (error.status === 404) {
           setErrorType("not_found");
@@ -37,6 +40,9 @@ export default function DetalleProducto() {
     };
 
     loadProduct();
+
+    window.addEventListener("online", loadProduct);
+    return () => window.removeEventListener("online", loadProduct);
   }, [id]);
 
   if (errorType === "server_error") {
@@ -66,6 +72,7 @@ export default function DetalleProducto() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {offlineData.active && <OfflineDataNotice cachedAt={offlineData.cachedAt} className="mb-6" />}
       <Link to="/productos" className="text-violet-600 hover:text-violet-700 text-sm font-medium transition-colors mb-8 inline-flex items-center gap-2">
         <span>{"<-"}</span> Volver al catalogo
       </Link>
@@ -76,7 +83,7 @@ export default function DetalleProducto() {
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-violet-200/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
 
           <img
-            src={prod.imagen || `https://placehold.co/800x800/F5F3FF/7C3AED?text=${encodeURIComponent(prod.nombre)}`}
+            src={prod.imagen || "/logo-panamericana-white-512.png"}
             alt={prod.nombre}
             className="w-full h-full object-contain relative z-10 transition-transform duration-700 group-hover:scale-105"
           />

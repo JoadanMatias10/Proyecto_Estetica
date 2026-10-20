@@ -16,6 +16,13 @@ const userSchema = new mongoose.Schema(
   {
     username: { type: String, unique: true, sparse: true, default: undefined, set: normalizeOptionalUsername },
     firebaseUid: { type: String, default: undefined, set: normalizeOptionalValue },
+    googleLinkedAt: { type: Date, default: null },
+    googleLinkedEmail: { type: String, lowercase: true, default: undefined, set: normalizeOptionalValue },
+    googleLinkMethod: {
+      type: String,
+      enum: ["google-signup", "authenticated-session"],
+      default: undefined,
+    },
     nombre: { type: String, required: true, trim: true },
     apellidoPaterno: { type: String, trim: true, default: "" },
     apellidoMaterno: { type: String, trim: true, default: "" },

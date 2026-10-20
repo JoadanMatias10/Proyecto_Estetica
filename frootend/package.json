@@ -18,7 +18,8 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "react-scripts build && node scripts/stamp-service-worker.js",
+    "serve:pwa": "node scripts/serve-build.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

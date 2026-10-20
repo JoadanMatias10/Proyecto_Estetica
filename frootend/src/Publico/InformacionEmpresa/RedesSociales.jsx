@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import OfflineDataNotice from "../../components/pwa/OfflineDataNotice";
 import { fetchPublicCompanyInfo } from "../../utils/publicCatalogApi";
 
 export default function RedesSociales() {
@@ -22,6 +23,8 @@ export default function RedesSociales() {
     };
 
     loadCompanyInfo();
+    window.addEventListener("online", loadCompanyInfo);
+    return () => window.removeEventListener("online", loadCompanyInfo);
   }, []);
 
   if (loading) {
@@ -32,6 +35,8 @@ export default function RedesSociales() {
     <div className="max-w-4xl mx-auto px-4 py-12">
       <h1 className="page-title">Redes sociales</h1>
       <p className="page-subtitle mt-2">Sigue a la estetica en nuestras redes oficiales.</p>
+
+      {companyInfo?.__offline && <OfflineDataNotice cachedAt={companyInfo.__cachedAt} className="mt-6" />}
 
       {errorMessage && (
         <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">

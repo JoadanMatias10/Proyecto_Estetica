@@ -10,10 +10,6 @@ const Service = require("../models/Servicio");
 const CompanyInfo = require("../models/InformacionEmpresa");
 const CarouselSlide = require("../models/DiapositivaCarrusel");
 const Promotion = require("../models/Promocion");
-const {
-  FirebaseAdminConfigurationError,
-  getFirebaseAdminAuth,
-} = require("../config/firebaseAdmin");
 const { hashPassword, verifyPassword } = require("../utils/contrasena");
 const { createToken } = require("../utils/auth");
 const {
@@ -34,16 +30,16 @@ const {
   validatePassword,
 } = require("../utils/validadores");
 const { normalizeServiceSegmentInRecord } = require("../utils/serviceSegments");
+const {
+  buildClientProfileMetadata,
+  hasVerifiedGoogleLink,
+} = require("../utils/clientProfile");
+const {
+  GoogleAuthVerificationError,
+  verifyGoogleFirebaseIdToken,
+} = require("../utils/googleAuth");
 
 const router = express.Router();
-
-const INVALID_FIREBASE_TOKEN_CODES = new Set([
-  "auth/argument-error",
-  "auth/id-token-expired",
-  "auth/id-token-revoked",
-  "auth/invalid-id-token",
-  "auth/user-disabled",
-]);
 
 function isValidId(id) {
   return mongoose.Types.ObjectId.isValid(id);
@@ -110,6 +106,7 @@ function buildUserResponse(user) {
     correo: user.correo,
     role: user.role,
     accountStatus: user.accountStatus || ACCOUNT_STATUS.ACTIVE,
+    ...buildClientProfileMetadata(user),
   };
 }
 
@@ -127,9 +124,38 @@ function buildBlockedLoginMessage(user) {
 function sendClientSession(res, user, message = "Inicio de sesion con Google correcto.") {
   return res.json({
     message,
-    token: createToken({ id: user._id, correo: user.correo, role: user.role }),
+    token: createToken({
+      id: user._id,
+      correo: user.correo,
+      role: user.role,
+      authMethod: "google",
+    }),
     user: buildUserResponse(user),
   });
+}
+
+function sendAccountLinkRequired(res) {
+  return res.status(409).json({
+    code: "ACCOUNT_LINK_REQUIRED",
+    errors: [
+      "Ya existe una cuenta con este correo. Inicia sesion con tu contrasena para vincular Google de forma segura.",
+    ],
+  });
+}
+
+function sendGoogleVerificationError(res, error) {
+  if (!(error instanceof GoogleAuthVerificationError)) {
+    console.error("Error inesperado verificando Google:", error);
+    return res.status(503).json({
+      code: "GOOGLE_AUTH_UNAVAILABLE",
+      errors: ["El acceso con Google no esta disponible temporalmente."],
+    });
+  }
+
+  if (error.cause) {
+    console.warn("Firebase rechazo una autenticacion de Google:", error.cause.code || error.cause.message);
+  }
+  return res.status(error.status).json({ code: error.code, errors: [error.message] });
 }
 
 async function resolveTokenUser(token, type) {
@@ -189,7 +215,12 @@ router.post("/register", async (req, res) => {
 
     return res.status(201).json({
       message: "Registro exitoso.",
-      token: createToken({ id: user._id, correo: user.correo, role: user.role }),
+      token: createToken({
+        id: user._id,
+        correo: user.correo,
+        role: user.role,
+        authMethod: "password",
+      }),
       user: buildUserResponse(user),
     });
   } catch (error) {
@@ -248,45 +279,25 @@ router.post("/login", async (req, res) => {
 
   return res.json({
     message: "Inicio de sesion correcto.",
-    token: createToken({ id: user._id, correo: user.correo, role: user.role }),
+    token: createToken({
+      id: user._id,
+      correo: user.correo,
+      role: user.role,
+      authMethod: "password",
+    }),
     user: buildUserResponse(user),
   });
 });
 
 router.post("/google-login", async (req, res) => {
-  const firebaseIdToken = normalizeString(req.body?.firebaseIdToken);
-  if (!firebaseIdToken || firebaseIdToken.length > 10000) {
-    return res.status(400).json({ errors: ["Token de Firebase invalido."] });
-  }
-
-  let decodedToken;
+  let googleIdentity;
   try {
-    decodedToken = await getFirebaseAdminAuth().verifyIdToken(firebaseIdToken, true);
+    googleIdentity = await verifyGoogleFirebaseIdToken(req.body?.firebaseIdToken);
   } catch (error) {
-    if (error instanceof FirebaseAdminConfigurationError) {
-      console.error("Firebase Admin no esta configurado para el inicio con Google:", error.message);
-      return res.status(503).json({
-        errors: ["El acceso con Google no esta disponible temporalmente."],
-      });
-    }
-
-    if (INVALID_FIREBASE_TOKEN_CODES.has(error?.code)) {
-      console.warn("Firebase rechazo un token de inicio con Google.", error.code);
-      return res.status(401).json({ errors: ["La sesion de Google no es valida."] });
-    }
-
-    console.error("Firebase Admin no pudo verificar el token:", error?.code || error?.message);
-    return res.status(503).json({
-      errors: ["El acceso con Google no esta disponible temporalmente."],
-    });
+    return sendGoogleVerificationError(res, error);
   }
 
-  const provider = decodedToken.firebase?.sign_in_provider;
-  const firebaseUid = normalizeString(decodedToken.uid);
-  const email = normalizeEmail(decodedToken.email);
-  if (provider !== "google.com" || !firebaseUid || !email || decodedToken.email_verified !== true) {
-    return res.status(401).json({ errors: ["La cuenta de Google no pudo verificarse."] });
-  }
+  const { displayName, email, firebaseUid } = googleIdentity;
 
   try {
     let user = await User.findOne({ firebaseUid: { $eq: firebaseUid } });
@@ -301,6 +312,39 @@ router.post("/google-login", async (req, res) => {
       const blockedMessage = buildBlockedLoginMessage(user);
       if (blockedMessage) {
         return res.status(403).json({ errors: [blockedMessage] });
+      }
+
+      if (user.passwordHash && !hasVerifiedGoogleLink(user)) {
+        return sendAccountLinkRequired(res);
+      }
+
+      // Los clientes creados originalmente solo con Google ya probaron la posesion
+      // del UID. Se completa la metadata de auditoria sin convertir cuentas locales.
+      if (!user.passwordHash && !hasVerifiedGoogleLink(user)) {
+        user = await User.findOneAndUpdate(
+          {
+            _id: user._id,
+            firebaseUid: { $eq: firebaseUid },
+            $or: [
+              { passwordHash: { $exists: false } },
+              { passwordHash: null },
+            ],
+          },
+          {
+            $set: {
+              googleLinkedAt: new Date(),
+              googleLinkedEmail: email,
+              googleLinkMethod: "google-signup",
+            },
+          },
+          { new: true, runValidators: true },
+        );
+        if (!user) {
+          return res.status(409).json({
+            code: "GOOGLE_ACCOUNT_CHANGED",
+            errors: ["La cuenta cambio durante el acceso. Intenta nuevamente."],
+          });
+        }
       }
 
       return sendClientSession(res, user);
@@ -320,38 +364,22 @@ router.post("/google-login", async (req, res) => {
         return res.status(403).json({ errors: [blockedMessage] });
       }
 
-      if (user.firebaseUid && user.firebaseUid !== firebaseUid) {
+      if (user.firebaseUid) {
         return res.status(409).json({
+          code: "GOOGLE_ACCOUNT_CONFLICT",
           errors: ["Este correo ya esta vinculado a otra cuenta de Google."],
         });
       }
-
-      user = await User.findOneAndUpdate(
-        {
-          _id: user._id,
-          accountStatus: ACCOUNT_STATUS.ACTIVE,
-          role: "client",
-          $or: [
-            { firebaseUid: { $exists: false } },
-            { firebaseUid: null },
-            { firebaseUid: { $eq: firebaseUid } },
-          ],
-        },
-        { $set: { firebaseUid } },
-        { new: true, runValidators: true },
-      );
-
-      if (!user) {
-        return res.status(409).json({
-          errors: ["La cuenta cambio mientras se vinculaba con Google. Intenta nuevamente."],
-        });
-      }
+      return sendAccountLinkRequired(res);
     } else {
-      const names = splitGoogleDisplayName(decodedToken.name, email);
+      const names = splitGoogleDisplayName(displayName, email);
       user = await User.create({
         ...names,
         correo: email,
         firebaseUid,
+        googleLinkedAt: new Date(),
+        googleLinkedEmail: email,
+        googleLinkMethod: "google-signup",
         role: "client",
         accountStatus: ACCOUNT_STATUS.ACTIVE,
       });
@@ -364,12 +392,19 @@ router.post("/google-login", async (req, res) => {
       if (
         linkedUser &&
         linkedUser.role === "client" &&
-        !buildBlockedLoginMessage(linkedUser)
+        !buildBlockedLoginMessage(linkedUser) &&
+        (!linkedUser.passwordHash || hasVerifiedGoogleLink(linkedUser))
       ) {
         return sendClientSession(res, linkedUser);
       }
 
+      const emailUser = await User.findOne({ correo: { $eq: email } });
+      if (emailUser && !emailUser.firebaseUid && emailUser.role === "client") {
+        return sendAccountLinkRequired(res);
+      }
+
       return res.status(409).json({
+        code: "GOOGLE_ACCOUNT_CONFLICT",
         errors: ["La cuenta de Google ya esta vinculada a otro usuario."],
       });
     }

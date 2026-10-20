@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import OfflineDataNotice from "../../components/pwa/OfflineDataNotice";
 import { fetchPublicCompanyInfo } from "../../utils/publicCatalogApi";
 
 function parseEsenciaItems(rawText) {
@@ -33,6 +34,8 @@ export default function QuienesSomos() {
     };
 
     loadCompanyInfo();
+    window.addEventListener("online", loadCompanyInfo);
+    return () => window.removeEventListener("online", loadCompanyInfo);
   }, []);
 
   const esenciaItems = useMemo(
@@ -47,6 +50,8 @@ export default function QuienesSomos() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
       <h1 className="page-title">Quienes somos</h1>
+
+      {companyInfo?.__offline && <OfflineDataNotice cachedAt={companyInfo.__cachedAt} className="mt-6" />}
 
       {errorMessage ? (
         <p className="mt-3 text-red-600 text-sm">{errorMessage}</p>

@@ -1,25 +1,35 @@
 {
-  "short_name": "Estetica",
-  "name": "Estetica Panamericana",
+  "id": "/",
+  "short_name": "Estética",
+  "name": "Estética Panamericana",
+  "description": "Servicios de belleza y catálogo público de Estética Panamericana.",
+  "lang": "es-MX",
+  "dir": "ltr",
   "icons": [
     {
-      "src": "logo-panamericana-white-favicon.png",
+      "src": "/logo-panamericana-white-192.png",
       "type": "image/png",
-      "sizes": "256x256"
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
-      "src": "logo-panamericana-white-192.png",
+      "src": "/logo-panamericana-white-512.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "512x512",
+      "purpose": "any"
     },
     {
-      "src": "logo-panamericana-white-512.png",
+      "src": "/logo-panamericana-white-512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "orientation": "any",
+  "theme_color": "#7c3aed",
+  "background_color": "#fff9fc",
+  "categories": ["beauty", "lifestyle"]
 }

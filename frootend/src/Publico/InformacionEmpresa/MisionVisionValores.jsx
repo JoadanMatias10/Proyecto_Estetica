@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import OfflineDataNotice from "../../components/pwa/OfflineDataNotice";
 import { fetchPublicCompanyInfo } from "../../utils/publicCatalogApi";
 
 function parseValores(rawValue) {
@@ -28,6 +29,8 @@ export default function MisionVisionValores() {
     };
 
     loadCompanyInfo();
+    window.addEventListener("online", loadCompanyInfo);
+    return () => window.removeEventListener("online", loadCompanyInfo);
   }, []);
 
   const valores = useMemo(
@@ -42,6 +45,8 @@ export default function MisionVisionValores() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
       <h1 className="page-title">Mision, vision y valores</h1>
+
+      {companyInfo?.__offline && <OfflineDataNotice cachedAt={companyInfo.__cachedAt} className="mt-6" />}
 
       {errorMessage && (
         <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">

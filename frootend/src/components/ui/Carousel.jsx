@@ -107,6 +107,15 @@ export default function Carousel({ className = "", overlay = null }) {
         setLoading(true);
       }
 
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        hasFetchedOnceRef.current = true;
+        if (isMounted) {
+          setSlides(cachedSlidesRef.current);
+          setLoading(false);
+        }
+        return;
+      }
+
       try {
         const data = await requestJson(endpoints.publicCarousel);
         if (!isMounted) return;
@@ -129,10 +138,12 @@ export default function Carousel({ className = "", overlay = null }) {
 
     loadSlides();
     window.addEventListener("carouselSlidesUpdated", loadSlides);
+    window.addEventListener("online", loadSlides);
 
     return () => {
       isMounted = false;
       window.removeEventListener("carouselSlidesUpdated", loadSlides);
+      window.removeEventListener("online", loadSlides);
     };
   }, []);
 

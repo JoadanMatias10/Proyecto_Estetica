@@ -184,11 +184,13 @@ export default function Home() {
 
     window.addEventListener("homeHighlightsUpdated", handleHighlightsUpdated);
     window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("online", loadHighlights);
 
     return () => {
       isMounted = false;
       window.removeEventListener("homeHighlightsUpdated", handleHighlightsUpdated);
       window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("online", loadHighlights);
     };
   }, []);
 
@@ -295,7 +297,7 @@ export default function Home() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
                 {services.map((service) => {
-                  const imageUrl = service.imagen || `https://placehold.co/800x500/F5F3FF/7C3AED?text=${encodeURIComponent(service.nombre || "Servicio")}`;
+                  const imageUrl = service.imagen || "/logo-panamericana-white-512.png";
                   const imageSources = buildCardImageSources(imageUrl);
 
                   return (
@@ -352,7 +354,7 @@ export default function Home() {
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
                 {products.map((product) => {
                   const presentation = formatProductPresentation(product);
-                  const imageUrl = product.imagen || "https://placehold.co/600x400/EDE9FE/7C3AED?text=AVYNA";
+                  const imageUrl = product.imagen || "/logo-panamericana-white-512.png";
                   const imageSources = buildCardImageSources(imageUrl);
 
                   return (

@@ -134,6 +134,12 @@ export async function requestJson(url, options = {}) {
   });
 
   const data = await response.json().catch(() => ({}));
+  if (data && typeof data === "object") {
+    data.__pwa = {
+      offlineFallback: response.headers.get("X-Estetica-Offline-Fallback") === "true",
+      cachedAt: response.headers.get("X-Estetica-Cached-At") || "",
+    };
+  }
   if (!response.ok) {
     const message = Array.isArray(data.errors) && data.errors.length
       ? data.errors[0]

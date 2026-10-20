@@ -2,10 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Button from "../../components/ui/Button";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import OfflineDataNotice from "../../components/pwa/OfflineDataNotice";
+import VoiceSearchButton from "../../components/pwa/VoiceSearchButton";
 import SidebarIcon from "../../components/ui/SidebarIcon";
 import { buildCloudinaryImageUrl, buildCloudinarySrcSet } from "../../utils/cloudinaryImage";
 import { fetchPublicProductsBundle } from "../../utils/publicCatalogApi";
 import { formatProductPresentation } from "../../utils/productPresentation";
+import { filterProductsBySearch } from "../../utils/productSearch";
 
 const PRODUCT_IMAGE_VARIANTS = [
   { width: 360, height: 270 },
@@ -23,6 +26,7 @@ export default function Catalogo() {
   const [isLoading, setIsLoading] = useState(true);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [offlineData, setOfflineData] = useState({ active: false, cachedAt: "" });
   const filterTimerRef = useRef(null);
 
   useEffect(() => {
@@ -33,6 +37,7 @@ export default function Catalogo() {
         const data = await fetchPublicProductsBundle();
         setProductos(data.products);
         setCategoriesMap(data.categoriesMap);
+        setOfflineData({ active: data.isOfflineFallback, cachedAt: data.cachedAt });
       } catch (error) {
         setErrorMessage(error.message || "No fue posible cargar productos.");
       } finally {
@@ -41,6 +46,9 @@ export default function Catalogo() {
     };
 
     loadData();
+
+    window.addEventListener("online", loadData);
+    return () => window.removeEventListener("online", loadData);
   }, []);
 
   useEffect(() => {
@@ -57,12 +65,9 @@ export default function Catalogo() {
   }, [categoriesMap, selectedCategory]);
 
   const filteredProductos = useMemo(
-    () =>
-      productos.filter((product) => {
-        const matchesSearch = product.nombre.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesCategory = selectedCategory ? product.categoria === selectedCategory : true;
-        return matchesSearch && matchesCategory;
-      }),
+    () => filterProductsBySearch(productos, searchTerm).filter(
+      (product) => (selectedCategory ? product.categoria === selectedCategory : true)
+    ),
     [productos, searchTerm, selectedCategory]
   );
 
@@ -103,7 +108,7 @@ export default function Catalogo() {
           <p className="page-subtitle mt-2">Explora productos profesionales para tu cuidado.</p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 items-center w-full md:w-auto">
+        <div className="flex items-start gap-2 w-full md:w-auto">
           <div className="relative w-full sm:w-64">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
               <SidebarIcon name="search" className="h-4 w-4" />
@@ -116,8 +121,11 @@ export default function Catalogo() {
               className="search-input"
             />
           </div>
+          <VoiceSearchButton onTranscript={setSearchTerm} />
         </div>
       </div>
+
+      {offlineData.active && <OfflineDataNotice cachedAt={offlineData.cachedAt} className="mb-6" />}
 
       <div className="mb-10">
         <div className="flex flex-wrap gap-3 mb-4 justify-center md:justify-start">
@@ -174,7 +182,7 @@ export default function Catalogo() {
           ) : filteredProductos.length > 0 ? (
             filteredProductos.map((product, index) => {
               const presentation = formatProductPresentation(product);
-              const originalImageUrl = product.imagen || "https://placehold.co/600x400/EDE9FE/7C3AED?text=AVYNA";
+              const originalImageUrl = product.imagen || "/logo-panamericana-white-512.png";
               const optimizedImageUrl = buildCloudinaryImageUrl(originalImageUrl, {
                 crop: "fill",
                 gravity: "auto",

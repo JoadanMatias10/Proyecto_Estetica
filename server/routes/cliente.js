@@ -10,13 +10,23 @@ const StaffMember = require("../models/MiembroPersonal");
 const User = require("../models/Usuario");
 const cloudinary = require("../config/cloudinary");
 const { paymentProofUpload } = require("../middleware/multer");
-const { verifyToken } = require("../utils/auth");
+const { createToken, verifyToken } = require("../utils/auth");
+const { ACCOUNT_STATUS } = require("../utils/accountAccess");
+const {
+  buildClientProfileMetadata,
+  hasVerifiedGoogleLink,
+  isClientProfileComplete,
+} = require("../utils/clientProfile");
 const {
   buildClientNotificationResponse,
   deliverClientAppointmentNotification,
   triggerDueAppointmentReminderScan,
 } = require("../utils/clientNotifications");
 const { parseServiceDurationMinutes } = require("../utils/serviceDuration");
+const {
+  GoogleAuthVerificationError,
+  verifyGoogleFirebaseIdToken,
+} = require("../utils/googleAuth");
 const {
   buildAvailableSlotsForDate,
   buildDateRange,
@@ -51,6 +61,7 @@ const DEFAULT_NOTIFICATION_PREFERENCES = {
 };
 const PAYMENT_TYPES = new Set(["Producto", "Servicio"]);
 const PAYMENT_METHODS = new Set(["Tarjeta", "Transferencia", "Pago en sucursal"]);
+const ACCOUNT_LINK_SESSION_MAX_AGE_SECONDS = 5 * 60;
 const DEMO_BANK_CLABE = "000000000000000000";
 const CLOUDINARY_UNAVAILABLE_MESSAGE =
   "La carga de comprobantes no esta disponible. Configura Cloudinary en el servidor.";
@@ -116,7 +127,34 @@ function buildUserResponse(user) {
     telefono: user.telefono || "",
     correo: user.correo || "",
     role: user.role || "client",
+    accountStatus: user.accountStatus || ACCOUNT_STATUS.ACTIVE,
+    ...buildClientProfileMetadata(user),
   };
+}
+
+function sendGoogleVerificationError(res, error) {
+  if (!(error instanceof GoogleAuthVerificationError)) {
+    console.error("Error inesperado verificando Google:", error);
+    return res.status(503).json({
+      code: "GOOGLE_AUTH_UNAVAILABLE",
+      errors: ["El acceso con Google no esta disponible temporalmente."],
+    });
+  }
+
+  if (error.cause) {
+    console.warn("Firebase rechazo una autenticacion de Google:", error.cause.code || error.cause.message);
+  }
+  return res.status(error.status).json({ code: error.code, errors: [error.message] });
+}
+
+function requireCompleteClientProfile(req, res, next) {
+  if (isClientProfileComplete(req.client)) return next();
+
+  return res.status(409).json({
+    code: "PROFILE_INCOMPLETE",
+    errors: ["Completa los datos obligatorios de tu perfil para continuar."],
+    user: buildUserResponse(req.client),
+  });
 }
 
 function buildAppointmentResponse(appointment) {
@@ -508,7 +546,7 @@ async function ensureStylistAvailable(stylistId, fechaHora, durationMinutes, exc
   return { ok: true, stylist };
 }
 
-router.use((req, res, next) => {
+router.use(async (req, res, next) => {
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const payload = verifyToken(token);
@@ -518,16 +556,37 @@ router.use((req, res, next) => {
   if (payload.role !== "client") {
     return res.status(403).json({ errors: ["Acceso denegado para este rol."] });
   }
-  req.user = payload;
-  return next();
+  if (!isValidId(payload.id)) {
+    return res.status(401).json({ errors: ["No autorizado."] });
+  }
+
+  try {
+    const client = await User.findOne({ _id: payload.id, role: "client" });
+    if (!client) {
+      return res.status(401).json({ errors: ["La sesion ya no corresponde a un cliente valido."] });
+    }
+    if ((client.accountStatus || ACCOUNT_STATUS.ACTIVE) !== ACCOUNT_STATUS.ACTIVE) {
+      return res.status(403).json({
+        code: "ACCOUNT_NOT_ACTIVE",
+        errors: ["La cuenta no se encuentra activa."],
+      });
+    }
+
+    req.user = {
+      ...payload,
+      id: String(client._id),
+      correo: client.correo,
+      role: client.role,
+    };
+    req.client = client;
+    return next();
+  } catch (error) {
+    return next(error);
+  }
 });
 
-router.get("/me", async (req, res) => {
-  const user = await User.findById(req.user.id);
-  if (!user) {
-    return res.status(404).json({ errors: ["Cliente no encontrado."] });
-  }
-  return res.json({ user: buildUserResponse(user) });
+router.get("/me", (req, res) => {
+  return res.json({ user: buildUserResponse(req.client) });
 });
 
 router.get("/stylists", async (_req, res) => {
@@ -578,16 +637,12 @@ router.get("/stylists/:id/availability", async (req, res) => {
   });
 });
 
-router.post("/profile/:id", async (req, res) => {
+async function updateAuthenticatedClientProfile(req, res) {
   const errors = [];
-  const { id } = req.params;
-  if (id !== req.user.id) {
-    return res.status(403).json({ errors: ["Acceso denegado."] });
-  }
   const { nombre, apellidoPaterno, apellidoMaterno, telefono, correo } = req.body;
 
   validateName(nombre, "Nombre", errors);
-  validateOptionalName(apellidoPaterno, "Apellido paterno", errors);
+  validateName(apellidoPaterno, "Apellido paterno", errors);
   validateOptionalName(apellidoMaterno, "Apellido materno", errors);
   validatePhone(telefono, errors);
   validateEmail(correo, errors);
@@ -598,34 +653,180 @@ router.post("/profile/:id", async (req, res) => {
 
   const normalizedEmail = normalizeString(correo).toLowerCase();
   const normalizedPhone = normalizeString(telefono);
+  const linkedGoogleEmail = normalizeString(
+    req.client.googleLinkedEmail || (req.client.firebaseUid ? req.client.correo : ""),
+  ).toLowerCase();
+
+  if (linkedGoogleEmail && normalizedEmail !== linkedGoogleEmail) {
+    return res.status(409).json({
+      code: "GOOGLE_EMAIL_IMMUTABLE",
+      errors: ["El correo verificado de una cuenta vinculada con Google no se puede cambiar."],
+    });
+  }
 
   const existing = await User.findOne({
-    _id: { $ne: id },
-    $or: [{ correo: normalizedEmail }, { telefono: normalizedPhone }],
+    _id: { $ne: req.client._id },
+    $or: [
+      { correo: { $eq: normalizedEmail } },
+      { telefono: { $eq: normalizedPhone } },
+    ],
   });
 
   if (existing) {
     return res.status(409).json({ errors: ["El correo o teléfono ya están en uso."] });
   }
 
-  const user = await User.findByIdAndUpdate(
-    id,
-    {
-      nombre: normalizeString(nombre),
-      apellidoPaterno: normalizeString(apellidoPaterno),
-      apellidoMaterno: normalizeString(apellidoMaterno),
-      telefono: normalizedPhone,
-      correo: normalizedEmail,
-    },
-    { new: true }
-  );
-
-  if (!user) {
-    return res.status(404).json({ errors: ["Cliente no encontrado."] });
+  let user;
+  try {
+    user = await User.findOneAndUpdate(
+      {
+        _id: req.client._id,
+        role: "client",
+        accountStatus: ACCOUNT_STATUS.ACTIVE,
+      },
+      {
+        $set: {
+          nombre: normalizeString(nombre),
+          apellidoPaterno: normalizeString(apellidoPaterno),
+          apellidoMaterno: normalizeString(apellidoMaterno),
+          telefono: normalizedPhone,
+          correo: normalizedEmail,
+        },
+      },
+      { new: true, runValidators: true },
+    );
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ errors: ["El correo o telefono ya estan en uso."] });
+    }
+    throw error;
   }
 
+  if (!user) {
+    return res.status(409).json({
+      code: "CLIENT_STATE_CHANGED",
+      errors: ["La cuenta cambio mientras se actualizaba el perfil. Inicia sesion nuevamente."],
+    });
+  }
+
+  req.client = user;
   return res.json({
     message: "Perfil actualizado correctamente.",
+    user: buildUserResponse(user),
+  });
+}
+
+router.post("/profile", updateAuthenticatedClientProfile);
+
+// Se conserva temporalmente para clientes moviles anteriores que enviaban el id en la URL.
+router.post("/profile/:id", async (req, res) => {
+  if (req.params.id !== req.user.id) {
+    return res.status(403).json({ errors: ["Acceso denegado."] });
+  }
+  return updateAuthenticatedClientProfile(req, res);
+});
+
+router.post("/google-link", async (req, res) => {
+  const issuedAt = Number(req.user.iat);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const hasRecentPasswordSession =
+    req.user.authMethod === "password" &&
+    Number.isFinite(issuedAt) &&
+    issuedAt <= nowSeconds + 60 &&
+    nowSeconds - issuedAt <= ACCOUNT_LINK_SESSION_MAX_AGE_SECONDS;
+
+  if (!hasRecentPasswordSession) {
+    return res.status(401).json({
+      code: "PASSWORD_REAUTHENTICATION_REQUIRED",
+      errors: ["Inicia sesion nuevamente con tu contrasena antes de vincular Google."],
+    });
+  }
+
+  let googleIdentity;
+  try {
+    googleIdentity = await verifyGoogleFirebaseIdToken(req.body?.firebaseIdToken, {
+      requireRecent: true,
+    });
+  } catch (error) {
+    return sendGoogleVerificationError(res, error);
+  }
+
+  const accountEmail = normalizeString(req.client.correo).toLowerCase();
+  if (googleIdentity.email !== accountEmail) {
+    return res.status(409).json({
+      code: "GOOGLE_EMAIL_MISMATCH",
+      errors: ["La cuenta de Google debe usar el mismo correo que tu cuenta de cliente."],
+    });
+  }
+
+  if (req.client.firebaseUid && req.client.firebaseUid !== googleIdentity.firebaseUid) {
+    return res.status(409).json({
+      code: "GOOGLE_ACCOUNT_CONFLICT",
+      errors: ["Esta cuenta de cliente ya esta vinculada a otra cuenta de Google."],
+    });
+  }
+
+  const uidOwner = await User.findOne({
+    firebaseUid: { $eq: googleIdentity.firebaseUid },
+    _id: { $ne: req.client._id },
+  }).select("_id");
+  if (uidOwner) {
+    return res.status(409).json({
+      code: "GOOGLE_ACCOUNT_CONFLICT",
+      errors: ["Esta cuenta de Google ya esta vinculada a otro usuario."],
+    });
+  }
+
+  let user;
+  try {
+    user = await User.findOneAndUpdate(
+      {
+        _id: req.client._id,
+        role: "client",
+        accountStatus: ACCOUNT_STATUS.ACTIVE,
+        correo: { $eq: googleIdentity.email },
+        $or: [
+          { firebaseUid: { $exists: false } },
+          { firebaseUid: null },
+          { firebaseUid: { $eq: googleIdentity.firebaseUid } },
+        ],
+      },
+      {
+        $set: {
+          firebaseUid: googleIdentity.firebaseUid,
+          googleLinkedAt: new Date(),
+          googleLinkedEmail: googleIdentity.email,
+          googleLinkMethod: "authenticated-session",
+        },
+      },
+      { new: true, runValidators: true },
+    );
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({
+        code: "GOOGLE_ACCOUNT_CONFLICT",
+        errors: ["Esta cuenta de Google ya esta vinculada a otro usuario."],
+      });
+    }
+    throw error;
+  }
+
+  if (!user || !hasVerifiedGoogleLink(user)) {
+    return res.status(409).json({
+      code: "CLIENT_STATE_CHANGED",
+      errors: ["La cuenta cambio durante la vinculacion. Inicia sesion nuevamente."],
+    });
+  }
+
+  req.client = user;
+  return res.json({
+    message: "Cuenta de Google vinculada correctamente.",
+    token: createToken({
+      id: user._id,
+      correo: user.correo,
+      role: user.role,
+      authMethod: "google",
+    }),
     user: buildUserResponse(user),
   });
 });
@@ -768,6 +969,7 @@ router.get("/payment-config", (_req, res) => {
 
 router.post(
   "/payments",
+  requireCompleteClientProfile,
   requirePaymentProofUploadSupport,
   paymentProofUpload.single("comprobante"),
   async (req, res) => {
@@ -784,6 +986,9 @@ router.post(
   }
   if (!method) {
     errors.push("Metodo de pago invalido.");
+  }
+  if (method === "Tarjeta") {
+    errors.push("El pago con tarjeta no esta disponible hasta configurar una pasarela segura.");
   }
   if (method === "Transferencia") {
     if (reference.length < 4) {
@@ -847,6 +1052,9 @@ router.post(
   }
   if (errors.length) {
     await cleanupUploadedPaymentProof(uploadedProof);
+    if (method === "Tarjeta") {
+      return res.status(503).json({ code: "CARD_PAYMENT_UNAVAILABLE", errors });
+    }
     return res.status(400).json({ errors });
   }
 
@@ -928,7 +1136,7 @@ router.get("/appointments", async (req, res) => {
   return res.json({ appointments: appointments.map(buildAppointmentResponse) });
 });
 
-router.post("/appointments", async (req, res) => {
+router.post("/appointments", requireCompleteClientProfile, async (req, res) => {
   const errors = [];
   const { serviceId, servicio, fecha, hora, notas, stylistId } = req.body;
 

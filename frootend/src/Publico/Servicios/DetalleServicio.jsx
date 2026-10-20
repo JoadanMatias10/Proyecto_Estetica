@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import OfflineDataNotice from "../../components/pwa/OfflineDataNotice";
 import ErrorPage from "../Error/ErrorPage";
-import { endpoints, requestJson } from "../../api";
+import { fetchPublicServiceById } from "../../utils/publicCatalogApi";
 
 function getGalleryImages(service) {
   return (Array.isArray(service?.galeriaImagenes) ? service.galeriaImagenes : [])
@@ -11,7 +12,7 @@ function getGalleryImages(service) {
 
 function getServiceImage(service) {
   return service?.imagen
-    || `https://placehold.co/1200x900/F5F3FF/7C3AED?text=${encodeURIComponent(service?.nombre || "Servicio")}`;
+    || "/logo-panamericana-white-512.png";
 }
 
 export default function DetalleServicio() {
@@ -19,6 +20,7 @@ export default function DetalleServicio() {
   const [service, setService] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorType, setErrorType] = useState("");
+  const [offlineData, setOfflineData] = useState({ active: false, cachedAt: "" });
 
   useEffect(() => {
     const loadService = async () => {
@@ -31,8 +33,9 @@ export default function DetalleServicio() {
       setIsLoading(true);
       setErrorType("");
       try {
-        const data = await requestJson(endpoints.publicServiceById(id));
+        const data = await fetchPublicServiceById(id);
         setService(data.service || null);
+        setOfflineData({ active: data.isOfflineFallback, cachedAt: data.cachedAt });
       } catch (error) {
         if (error.status === 404) {
           setErrorType("not_found");
@@ -45,6 +48,9 @@ export default function DetalleServicio() {
     };
 
     loadService();
+
+    window.addEventListener("online", loadService);
+    return () => window.removeEventListener("online", loadService);
   }, [id]);
 
   const galleryImages = useMemo(() => getGalleryImages(service), [service]);
@@ -76,6 +82,7 @@ export default function DetalleServicio() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {offlineData.active && <OfflineDataNotice cachedAt={offlineData.cachedAt} className="mb-6" />}
       <Link to="/servicios" className="inline-flex items-center gap-2 mb-8 text-sm font-medium text-violet-600 transition-colors hover:text-violet-700">
         <span>{"<-"}</span> Volver a servicios
       </Link>

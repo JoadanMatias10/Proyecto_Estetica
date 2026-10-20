@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#7c3aed" />
+    <title>Sin conexión | Estética Panamericana</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        color: #334155;
+        background: linear-gradient(180deg, #fff9fc 0%, #f5f3ff 100%);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      main {
+        width: min(100%, 520px);
+        padding: 36px;
+        text-align: center;
+        border: 1px solid #ede9fe;
+        border-radius: 28px;
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: 0 20px 50px rgba(91, 33, 182, 0.12);
+      }
+      img { width: 112px; height: 112px; object-fit: cover; border-radius: 22px; }
+      h1 { margin: 24px 0 12px; color: #1e293b; font-size: clamp(1.7rem, 6vw, 2.25rem); }
+      p { margin: 0; line-height: 1.65; }
+      nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 28px; }
+      a, button {
+        min-height: 44px;
+        padding: 11px 18px;
+        border: 1px solid #7c3aed;
+        border-radius: 12px;
+        font: inherit;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      a { color: #7c3aed; background: #fff; }
+      button { color: #fff; background: #7c3aed; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/logo-panamericana-white-192.png" alt="Logotipo de Estética Panamericana" />
+      <h1>Esta función requiere conexión</h1>
+      <p>No hay internet disponible y esta sección no puede realizarse sin comunicarse con el servidor. Los catálogos públicos que hayas consultado antes sí pueden seguir disponibles.</p>
+      <nav aria-label="Opciones sin conexión">
+        <a href="/">Ir al inicio</a>
+        <button type="button" onclick="window.location.reload()">Reintentar</button>
+      </nav>
+    </main>
+  </body>
+</html>

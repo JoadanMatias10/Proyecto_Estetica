@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import OfflineDataNotice from "../../components/pwa/OfflineDataNotice";
 import { fetchPublicCompanyInfo } from "../../utils/publicCatalogApi";
 
 function detectDataUrlMimeType(value) {
@@ -27,6 +28,8 @@ export default function PoliticaPrivacidad() {
     };
 
     loadCompanyInfo();
+    window.addEventListener("online", loadCompanyInfo);
+    return () => window.removeEventListener("online", loadCompanyInfo);
   }, []);
 
   const documentUrl = companyInfo?.politicasDocumento || "";
@@ -44,6 +47,8 @@ export default function PoliticaPrivacidad() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
       <h1 className="page-title">Politica de privacidad</h1>
+
+      {companyInfo?.__offline && <OfflineDataNotice cachedAt={companyInfo.__cachedAt} className="mt-6" />}
 
       {errorMessage && (
         <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -80,7 +85,11 @@ export default function PoliticaPrivacidad() {
         </div>
       ) : (
         <div className="card mt-8 p-7 space-y-4 text-slate-600">
-          <p>Aun no hay un documento de politicas publicado.</p>
+          <p>
+            {companyInfo?.__offline
+              ? "El documento oficial requiere conexión a Internet y no forma parte de la copia local."
+              : "Aun no hay un documento de politicas publicado."}
+          </p>
         </div>
       )}
     </div>
