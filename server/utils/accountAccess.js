@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { hashPassword } = require("./contrasena");
 const { sendTransactionalEmail } = require("./brevo");
+const { buildMobilePasswordResetEmailUrl } = require("./mobilePasswordReset");
 
 const INTERNAL_USER_ROLES = new Set(["admin", "stylist"]);
 const STAFF_ROLE_TO_USER_ROLE = {
@@ -19,8 +20,6 @@ const ACCOUNT_STATUS = {
 const INVITE_EXPIRATION_MS = 1000 * 60 * 60 * 24 * 7;
 const PASSWORD_RESET_EXPIRATION_MS = 1000 * 60 * 60 * 2;
 const DEFAULT_APP_BASE_URL = "https://proyecto-estetica.vercel.app";
-const DEFAULT_MOBILE_PASSWORD_RESET_URL =
-  "esteticapanamericana:///public/reset-password";
 
 function mapStaffRoleToUserRole(staffRole) {
   return STAFF_ROLE_TO_USER_ROLE[String(staffRole || "").trim()] || null;
@@ -55,20 +54,6 @@ function buildAppUrl(pathname, params = {}) {
     url.searchParams.set(key, String(value));
   }
 
-  return url.toString();
-}
-
-function buildMobilePasswordResetUrl(token) {
-  const configuredUrl = String(process.env.MOBILE_PASSWORD_RESET_URL || "").trim();
-  let url;
-
-  try {
-    url = new URL(configuredUrl || DEFAULT_MOBILE_PASSWORD_RESET_URL);
-  } catch {
-    url = new URL(DEFAULT_MOBILE_PASSWORD_RESET_URL);
-  }
-
-  url.searchParams.set("token", String(token || ""));
   return url.toString();
 }
 
@@ -241,18 +226,16 @@ function buildInviteEmail(user, token) {
   };
 }
 
-function buildPasswordResetEmail(user, token, { openInMobileApp = false } = {}) {
-  const webLink = buildAppUrl("/restablecer-contrasena", { token });
-  const link = openInMobileApp ? buildMobilePasswordResetUrl(token) : webLink;
-  const webFallbackHtml = openInMobileApp
-    ? `
-      <p style="margin:16px 0 6px; font-size:12px; color:#64748b; line-height:1.5;">
-        Si no tienes la aplicaci&oacute;n instalada, tambi&eacute;n puedes continuar desde el sitio web:
-      </p>
-      <a href="${webLink}" style="font-size:12px; color:#2563eb; text-decoration:underline; word-break:break-all; line-height:1.35;">${webLink}</a>
-    `
-    : "";
+function buildPasswordResetEmail(user, token, { openInMobileApp = false, mobileResetUrl } = {}) {
+  const link = openInMobileApp
+    ? buildMobilePasswordResetEmailUrl(token, mobileResetUrl)
+    : buildAppUrl("/restablecer-contrasena", { token });
   const logoUrl = getLogoUrl();
+  const webFallbackHtml = openInMobileApp ? "" : `
+    <div style="background:#f8fafc; border-left:3px solid #0f766e; border-radius:6px; padding:10px 12px; margin-bottom:20px;">
+      <p style="margin:0; font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; line-height:1.2;">¿El botón no funciona?</p>
+      <a href="${link}" style="display:block; margin-top:2px; font-size:12px; color:#2563eb; text-decoration:underline; word-break:break-all; line-height:1.35;">${link}</a>
+    </div>`;
 
   const bodyHtml = `
     <p style="margin:0 0 8px; font-size:16px; color:#334155;">Hola, <strong>${user.nombre || "usuario"}</strong></p>
@@ -273,11 +256,7 @@ function buildPasswordResetEmail(user, token, { openInMobileApp = false } = {}) 
         </td>
       </tr>
     </table>
-    <div style="background:#f8fafc; border-left:3px solid #0f766e; border-radius:6px; padding:10px 12px; margin-bottom:20px;">
-      <p style="margin:0; font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; line-height:1.2;">¿El botón no funciona?</p>
-      <a href="${link}" style="display:block; margin-top:2px; font-size:12px; color:#2563eb; text-decoration:underline; word-break:break-all; line-height:1.35;">${link}</a>
-      ${webFallbackHtml}
-    </div>
+    ${webFallbackHtml}
     <p style="margin:0; font-size:13px; color:#94a3b8;">⏳ Este enlace vence en <strong>2 horas</strong>.</p>
   `;
 

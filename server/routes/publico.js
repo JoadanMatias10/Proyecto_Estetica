@@ -1,4 +1,8 @@
 const express = require("express");
+const crypto = require("node:crypto");
+const {
+  normalizeMobileResetUrl, resolveMobilePasswordResetTarget, buildMobilePasswordResetPage,
+} = require("../utils/mobilePasswordReset");
 const mongoose = require("mongoose");
 const User = require("../models/Usuario");
 const AccountAccessToken = require("../models/TokenAccesoCuenta");
@@ -421,6 +425,14 @@ router.post("/recover", async (req, res) => {
     const errors = [];
     const { correo } = req.body;
     const openInMobileApp = normalizeString(req.body.origen).toLowerCase() === "movil";
+    let mobileResetUrl;
+    if (openInMobileApp) {
+      try {
+        mobileResetUrl = normalizeMobileResetUrl(req.body.mobileResetUrl);
+      } catch {
+        return res.status(400).json({ errors: ["El enlace de retorno a la aplicacion no esta autorizado."] });
+      }
+    }
     validateEmail(correo, errors);
 
     if (errors.length) {
@@ -457,7 +469,7 @@ router.post("/recover", async (req, res) => {
       type: "password_reset",
       expiresInMs: PASSWORD_RESET_EXPIRATION_MS,
     });
-    await sendPasswordResetEmail(user, rawToken, { openInMobileApp });
+    await sendPasswordResetEmail(user, rawToken, { openInMobileApp, mobileResetUrl });
     user.passwordResetSentAt = new Date();
     await user.save();
 
@@ -538,6 +550,17 @@ router.post("/invite/accept", async (req, res) => {
       errors: ["No fue posible activar la cuenta."],
     });
   }
+});
+
+router.get("/reset-password/mobile", (req, res) => {
+  res.set({ "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" });
+  const target = resolveMobilePasswordResetTarget(req.query.link);
+  if (!target) {
+    return res.status(400).type("text/plain").send("El enlace de recuperacion movil no es valido o ya vencio. Solicita uno nuevo desde la aplicacion.");
+  }
+  const nonce = crypto.randomBytes(16).toString("base64");
+  res.set("Content-Security-Policy", `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'`);
+  return res.type("html").send(buildMobilePasswordResetPage(target, nonce));
 });
 
 router.get("/reset-password/validate", async (req, res) => {
