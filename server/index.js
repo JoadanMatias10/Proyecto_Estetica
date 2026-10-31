@@ -12,6 +12,7 @@ const { startClientNotificationScheduler } = require("./utils/clientNotification
 const { ensureCatalogData } = require("./utils/sembrarDatosCatalogo");
 const { createAccountDeletionRouter } = require("./routes/accountDeletion");
 const { startAccountDeletionWorker } = require("./utils/accountDeletion");
+const { createPrivacyPolicyRouter } = require("./routes/privacyPolicy");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -37,6 +38,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/public/account-deletion", createAccountDeletionRouter());
+app.use("/api/public/privacy-policy", createPrivacyPolicyRouter());
 app.use("/api/public", publicRoutes);
 app.use("/api/client", clientRoutes);
 app.use("/api/stylist", stylistRoutes);

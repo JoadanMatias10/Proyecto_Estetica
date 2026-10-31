@@ -1,0 +1,147 @@
+{
+  "title": "Política de privacidad",
+  "subtitle": "Aviso de privacidad y confidencialidad de la información",
+  "companyName": "Estética Panamericana",
+  "updatedAt": "2026-10-30",
+  "updatedAtText": "30 de octubre de 2026",
+  "sourceNoticeDate": "2025-09-26",
+  "contact": {
+    "email": "esteticapanamericanacitas@gmail.com",
+    "phone": "771 151 5958",
+    "address": "Velázquez Ibarra No. 782, Col. Centro, C.P. 43000, Ejido del Centro, Huejutla de Reyes, Hidalgo, México."
+  },
+  "introduction": "Este aviso explica cómo Estética Panamericana recopila, utiliza, almacena, comparte y protege los datos personales de quienes utilizan su aplicación móvil, sitio web y canales de atención, así como los medios para ejercer sus derechos.",
+  "sections": [
+    {
+      "id": "responsable",
+      "title": "1. Responsable del tratamiento",
+      "paragraphs": [
+        "Estética Panamericana, con domicilio en Velázquez Ibarra No. 782, Col. Centro, C.P. 43000, Ejido del Centro, Huejutla de Reyes, Hidalgo, es responsable del uso y protección de los datos personales recabados a través de su plataforma, sitio web y canales de atención.",
+        "El tratamiento se realiza conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares y demás disposiciones aplicables. Para consultas de privacidad puedes utilizar los medios de contacto indicados en este aviso."
+      ]
+    },
+    {
+      "id": "datos-personales",
+      "title": "2. Datos personales que tratamos",
+      "paragraphs": [
+        "El aviso del establecimiento comprende nombre, edad, teléfono, correo electrónico, domicilio y datos transaccionales, según la información proporcionada para los servicios solicitados.",
+        "En la aplicación se utilizan los datos de registro y contacto, identificadores de cuenta y autenticación, historial de citas, servicios contratados, compras, pagos, comprobantes y preferencias de comunicación. Si eliges iniciar sesión o vincular tu cuenta con Google, se utiliza la información de identidad necesaria para autenticarte y relacionarla con tu cuenta.",
+        "La foto de perfil seleccionada en la app se guarda en el dispositivo. Las imágenes que eliges como comprobantes de pago se envían al servidor para verificar y registrar el pago. El acceso a imágenes se inicia cuando utilizas estas funciones.",
+        "No se solicita información sobre salud, origen étnico, creencias religiosas, opiniones políticas o afiliaciones sindicales para utilizar la plataforma."
+      ]
+    },
+    {
+      "id": "finalidades-primarias",
+      "title": "3. Finalidades necesarias para el servicio",
+      "paragraphs": [
+        "Los datos personales se utilizan para proporcionar y administrar los servicios solicitados:"
+      ],
+      "items": [
+        "Crear y autenticar cuentas, mantener la sesión y proteger el acceso a la plataforma.",
+        "Agendar, confirmar, modificar y cancelar citas.",
+        "Gestionar expedientes e historial de servicios.",
+        "Registrar compras, pagos, comprobantes y la información de facturación que corresponda.",
+        "Enviar comunicaciones operativas y recordatorios relacionados con las citas y el servicio.",
+        "Atender consultas, solicitudes de derechos y eliminación de cuentas."
+      ]
+    },
+    {
+      "id": "finalidades-secundarias",
+      "title": "4. Finalidades opcionales",
+      "paragraphs": [
+        "El aviso del establecimiento contempla mercadotecnia y promociones, encuestas de satisfacción y programas de fidelidad para clientes frecuentes cuando se ofrezcan.",
+        "Puedes negar o retirar tu consentimiento para estas finalidades comunicándolo al contacto de privacidad. También puedes ajustar las preferencias de comunicación disponibles en tu perfil. La negativa a estas finalidades no condiciona la prestación de los servicios solicitados."
+      ]
+    },
+    {
+      "id": "consentimiento",
+      "title": "5. Consentimiento y uso de la información",
+      "paragraphs": [
+        "Los datos se tratan con el consentimiento que corresponda y para cumplir las obligaciones derivadas de la relación con el cliente, así como los supuestos permitidos por la ley. Puedes revocar tu consentimiento mediante el procedimiento descrito en este aviso, sin efectos retroactivos.",
+        "La información se utiliza para las finalidades comunicadas. La revocación respecto de datos necesarios para una función puede impedir que esa función siga prestándose."
+      ]
+    },
+    {
+      "id": "proveedores",
+      "title": "6. Proveedores que intervienen en la plataforma",
+      "paragraphs": [
+        "La plataforma utiliza proveedores tecnológicos para operar sus funciones. Estos servicios reciben los datos necesarios para la función correspondiente y pueden procesarlos fuera de México conforme a las disposiciones aplicables."
+      ],
+      "items": [
+        "Google y Firebase: verificación de identidad e inicio de sesión con Google cuando eliges utilizarlo.",
+        "Cloudinary: almacenamiento y gestión de las imágenes enviadas como comprobantes de pago.",
+        "Brevo: entrega de correos operativos, recuperación de acceso y códigos para confirmar la eliminación de cuentas.",
+        "Render: alojamiento y ejecución del servidor de la plataforma. La información del servicio se almacena en una base de datos MongoDB."
+      ]
+    },
+    {
+      "id": "transferencias",
+      "title": "7. Transferencias y divulgación de datos",
+      "paragraphs": [
+        "No se realizarán transferencias de datos personales a terceros sin el consentimiento que corresponda, salvo los casos previstos por ley, los requerimientos de autoridad competente o el tratamiento por proveedores necesario para la prestación del servicio, sujeto a las obligaciones de confidencialidad y seguridad aplicables.",
+        "Puedes solicitar información sobre las transferencias realizadas a través del contacto de privacidad."
+      ]
+    },
+    {
+      "id": "derechos-arco",
+      "title": "8. Derechos ARCO y revocación",
+      "paragraphs": [
+        "Puedes acceder a tus datos personales, rectificarlos, solicitar su cancelación u oponerte a su tratamiento, así como revocar tu consentimiento. Presenta tu solicitud mediante el correo de privacidad o en el domicilio del responsable.",
+        "La solicitud debe indicar tu nombre, un medio para comunicar la respuesta, la descripción clara del derecho que deseas ejercer y los datos que permitan localizar la información. Para acreditar la identidad o representación se solicitará la documentación que corresponda.",
+        "El plazo para comunicar la determinación es de hasta 20 días hábiles desde la recepción de la solicitud. Si resulta procedente, se hará efectiva dentro de los 15 días hábiles siguientes a la comunicación de la respuesta, con las ampliaciones permitidas por la ley.",
+        "La respuesta se comunica al correo indicado o mediante notificación escrita. La información puede entregarse mediante copia simple, archivo electrónico o impresión, previa acreditación de la identidad cuando corresponda."
+      ]
+    },
+    {
+      "id": "limitar-publicidad",
+      "title": "9. Limitar el uso o divulgación",
+      "paragraphs": [
+        "Puedes solicitar tu inscripción en el Listado Interno de Exclusión de Publicidad a través del contacto de privacidad e indicar las finalidades secundarias que no autorizas.",
+        "También puedes acudir al Registro Público para Evitar Publicidad de PROFECO en los términos de ese registro."
+      ]
+    },
+    {
+      "id": "cookies-almacenamiento",
+      "title": "10. Cookies y almacenamiento en el dispositivo",
+      "paragraphs": [
+        "El aviso del sitio web contempla el uso de cookies y tecnologías similares para mantener la sesión y preferencias, facilitar la navegación y obtener métricas de uso cuando estén habilitadas. Puedes desactivar o eliminar las cookies desde la configuración de tu navegador; algunas funciones podrían verse limitadas.",
+        "En la app se almacena información necesaria para la sesión y funciones locales, como el carrito y la foto de perfil seleccionada. Cerrar sesión o eliminar la cuenta desde la app inicia la limpieza de la sesión y el carrito. La foto local se elimina al confirmar la eliminación de la cuenta en ese dispositivo."
+      ]
+    },
+    {
+      "id": "seguridad",
+      "title": "11. Confidencialidad y seguridad",
+      "paragraphs": [
+        "Se aplican medidas administrativas y técnicas para proteger los datos personales, como control de acceso por cuenta y rol, protección de credenciales y comunicaciones mediante HTTPS. El aviso del establecimiento también contempla registros de actividad, respaldos y revisiones de seguridad.",
+        "El acceso a la información debe limitarse a las personas y proveedores que lo requieran para prestar el servicio y cumplir las obligaciones aplicables."
+      ]
+    },
+    {
+      "id": "conservacion",
+      "title": "12. Conservación y eliminación de datos",
+      "paragraphs": [
+        "La información de la cuenta se utiliza mientras sea necesaria para las finalidades del servicio y las obligaciones legales o contractuales aplicables. Puedes solicitar su eliminación mediante los mecanismos de este aviso.",
+        "Al confirmar la eliminación de la cuenta se desactiva el acceso y se eliminan automáticamente del servicio activo el perfil, datos de contacto, preferencias, citas, notificaciones, pagos y comprobantes asociados, así como los registros de autenticación vinculados a esta aplicación. Si un proveedor no responde, el proceso se reintenta automáticamente.",
+        "Las próximas citas dejan de estar disponibles. Los totales de ventas vinculadas se conservan para la contabilidad sin el nombre del cliente ni la referencia al pago eliminado. La eliminación de esta cuenta no elimina tu cuenta personal de Google.",
+        "Después de confirmar la eliminación de una cuenta, los datos personales que permanezcan en respaldos anteriores se conservan durante un máximo de 7 días. La gestión y eliminación de esos archivos históricos se realiza de forma separada del borrado automático del servicio activo. Puedes solicitar información o ejercer tus derechos sobre los respaldos y otros registros mediante el contacto de privacidad."
+      ]
+    },
+    {
+      "id": "eliminar-cuenta",
+      "title": "13. Cómo eliminar tu cuenta",
+      "paragraphs": [
+        "En la app, entra en Mi perfil → Eliminar cuenta. También puedes utilizar la página pública de eliminación, sin tener instalada la app ni iniciar sesión.",
+        "Solicita el código de 8 dígitos enviado al correo de tu cuenta, escríbelo y confirma expresamente la eliminación permanente. Solicitar un código por sí solo no elimina la cuenta. El código vence en 15 minutos.",
+        "Si no tienes acceso al correo o necesitas ayuda con otros datos personales, comunícate con el responsable mediante el contacto de privacidad."
+      ]
+    },
+    {
+      "id": "cambios",
+      "title": "14. Cambios al aviso y protección de derechos",
+      "paragraphs": [
+        "Las modificaciones a este aviso se publican en la página web oficial o se ponen a disposición en el establecimiento, indicando la fecha de actualización. Puedes consultar esta política desde la aplicación.",
+        "Si consideras vulnerado tu derecho a la protección de datos personales, puedes acudir ante la Secretaría Anticorrupción y Buen Gobierno, autoridad competente conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares."
+      ]
+    }
+  ]
+}
