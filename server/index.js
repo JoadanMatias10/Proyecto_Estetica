@@ -10,6 +10,8 @@ const adminRoutes = require("./routes/administrador");
 const alexaRoutes = require("./routes/alexa");
 const { startClientNotificationScheduler } = require("./utils/clientNotifications");
 const { ensureCatalogData } = require("./utils/sembrarDatosCatalogo");
+const { createAccountDeletionRouter } = require("./routes/accountDeletion");
+const { startAccountDeletionWorker } = require("./utils/accountDeletion");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -20,6 +22,9 @@ app.use(
   cors({
     origin: [
       "http://localhost:3000",
+      "http://127.0.0.1:3000",
+      "http://localhost:4173",
+      "http://127.0.0.1:4173",
       "https://proyecto-estetica.vercel.app"
     ],
     credentials: true,
@@ -31,6 +36,7 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+app.use("/api/public/account-deletion", createAccountDeletionRouter());
 app.use("/api/public", publicRoutes);
 app.use("/api/client", clientRoutes);
 app.use("/api/stylist", stylistRoutes);
@@ -61,8 +67,10 @@ async function start() {
   await mongoose.connect(MONGODB_URI, {
     dbName: process.env.MONGODB_DB_NAME || "Estetica_Panamericana",
   });
+  await require("./models/SolicitudEliminacionCuenta").init();
   await ensureCatalogData();
   startClientNotificationScheduler();
+  startAccountDeletionWorker();
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Servidor escuchando en el puerto ${PORT}`);
   });

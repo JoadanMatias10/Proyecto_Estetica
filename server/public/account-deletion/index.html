@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Eliminar mi cuenta · Estética Panamericana</title>
+  <link rel="stylesheet" href="/api/public/account-deletion/assets/style.css">
+  <script defer src="/api/public/account-deletion/assets/page.js"></script>
+</head>
+<body>
+  <main>
+    <header><span class="brand">ESTÉTICA PANAMERICANA</span><h1>Eliminar mi cuenta</h1><p>Tú decides sobre tu cuenta y tus datos.</p></header>
+    <section aria-labelledby="details-title">
+      <h2 id="details-title">Antes de continuar</h2>
+      <p>Se eliminarán tu perfil, nombre, correo, teléfono, preferencias, citas, notificaciones y comprobantes asociados. Tus próximas citas también se cancelarán.</p>
+      <p>Los totales de ventas se conservarán sin tu nombre ni vínculo con la cuenta para mantener la contabilidad. Tu cuenta personal de Google seguirá existiendo.</p>
+      <p class="warning">La eliminación es permanente. Solicitar un código todavía no elimina la cuenta: debes confirmar con el código recibido.</p>
+      <p>No necesitas tener instalada la aplicación ni iniciar sesión. Verificaremos que tienes acceso al correo de la cuenta.</p>
+    </section>
+    <section aria-labelledby="request-title">
+      <h2 id="request-title">1. Verifica tu correo</h2>
+      <form id="request-form">
+        <label for="email">Correo de la cuenta</label>
+        <input id="email" type="email" autocomplete="email" maxlength="254" required>
+        <button type="submit">Enviar código de confirmación</button>
+      </form>
+      <p class="hint">El código tiene 8 dígitos y vence en 15 minutos. Puedes solicitar otro después de un minuto.</p>
+    </section>
+    <section aria-labelledby="confirm-title">
+      <h2 id="confirm-title">2. Confirma la eliminación</h2>
+      <form id="confirm-form">
+        <label for="code">Código de eliminación</label>
+        <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{8}" minlength="8" maxlength="8" placeholder="8 dígitos" required>
+        <label class="check" for="confirmation"><input id="confirmation" type="checkbox" required><span>Entiendo que esta acción es permanente y quiero eliminar mi cuenta y mis datos.</span></label>
+        <button class="danger" type="submit">Eliminar mi cuenta permanentemente</button>
+      </form>
+    </section>
+    <p id="status" role="status" aria-live="polite"></p>
+    <noscript>Activa JavaScript en tu navegador para solicitar el código y confirmar la eliminación. También puedes hacerlo desde Perfil → Eliminar cuenta en la aplicación.</noscript>
+    <footer>Estética Panamericana · Control de tus datos</footer>
+  </main>
+</body>
+</html>

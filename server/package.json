@@ -16,7 +16,7 @@
     "cleanup:static": "node scripts/limpiarDatosEstaticosSemilla.js",
     "migrate:google-auth": "node scripts/migrarIndicesGoogleAuth.js",
     "renombrar:colecciones": "node scripts/renombrarColecciones.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test"
   },
   "keywords": [],
   "author": "",
