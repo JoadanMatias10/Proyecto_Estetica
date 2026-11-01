@@ -23,6 +23,7 @@ test('publica el aviso completo como HTML sin inicio de sesión, PDF ni JavaScri
   assert.match(html, /14\. Cambios al aviso y protección de derechos/);
   assert.match(html, /<p>El plazo para comunicar la determinación es de hasta 20 días hábiles/);
   assert.match(html, /href="\/api\/public\/account-deletion"/);
+  assert.match(html, /href="https:\/\/proyecto-estetica\.vercel\.app\/">← Volver al sitio web<\/a>/);
   assert.doesNotMatch(html, /<script|<iframe|<object|<embed|\.pdf["']/i);
   assert.doesNotMatch(html, /ALUMNO:|CONTRATO DE RESPONSABILIDAD LEGAL/);
   const css = await fetch(`${base}/assets/style.css`);

@@ -148,7 +148,7 @@ export default function PublicFooter() {
           <ul className="space-y-2">
             <li><Link to="/quienes-somos" className="text-slate-600 hover:text-violet-600 transition-colors duration-200">Quienes somos</Link></li>
             <li><Link to="/mision-vision-valores" className="text-slate-600 hover:text-violet-600 transition-colors duration-200">Mision, vision y valores</Link></li>
-            <li><a href={`${API_BASE_URL}/public/privacy-policy`} className="text-slate-600 hover:text-violet-600 transition-colors duration-200">Politica de privacidad</a></li>
+            <li><a href={`${API_BASE_URL}/public/privacy-policy`} target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-violet-600 transition-colors duration-200">Politica de privacidad</a></li>
           </ul>
         </div>
 

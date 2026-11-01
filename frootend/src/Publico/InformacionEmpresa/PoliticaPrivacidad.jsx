@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { API_BASE_URL } from "../../api";
 
 export default function PoliticaPrivacidad() {
@@ -15,10 +16,18 @@ export default function PoliticaPrivacidad() {
         </p>
         <a
           href={policyUrl}
+          target="_blank"
+          rel="noopener noreferrer"
           className="inline-flex items-center px-3 py-2 rounded-lg text-sm font-semibold text-violet-700 bg-violet-100 hover:bg-violet-200"
         >
           Abrir politica de privacidad
         </a>
+        <p className="text-sm text-slate-500">
+          El aviso se abrirá en otra pestaña. Cierra esa pestaña para volver aquí.
+        </p>
+        <Link to="/" className="block text-sm text-violet-700 hover:underline">
+          Volver al inicio
+        </Link>
       </div>
     </div>
   );

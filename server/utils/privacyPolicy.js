@@ -6,6 +6,7 @@ function escapeHtml(value) {
 
 function renderPrivacyPolicyPage(policy) {
   const escape = escapeHtml;
+  const siteUrl = "https://proyecto-estetica.vercel.app/";
   const contents = policy.sections.map((section) =>
     '<li><a href="#' + escape(section.id) + '">' + escape(section.title) + '</a></li>'
   ).join("\n");
@@ -22,6 +23,7 @@ function renderPrivacyPolicyPage(policy) {
     + '<title>' + escape(policy.title) + ' · ' + escape(policy.companyName) + '</title>'
     + '<link rel="stylesheet" href="/api/public/privacy-policy/assets/style.css">'
     + '</head>\n<body><a class="skip-link" href="#contenido">Ir al contenido</a><main id="contenido">'
+    + '<a class="back-link" href="' + siteUrl + '">← Volver al sitio web</a>'
     + '<header><span class="brand">' + escape(policy.companyName) + '</span>'
     + '<h1>' + escape(policy.title) + '</h1><p class="subtitle">' + escape(policy.subtitle) + '</p>'
     + '<p class="updated">Última actualización: <time datetime="' + escape(policy.updatedAt) + '">' + escape(policy.updatedAtText) + '</time></p>'
@@ -33,7 +35,8 @@ function renderPrivacyPolicyPage(policy) {
     + '<nav aria-label="Contenido del aviso"><h2>Contenido del aviso</h2><ol>' + contents + '</ol></nav>'
     + sections
     + '<div class="actions"><a class="button" href="/api/public/account-deletion">Solicitar eliminación de cuenta</a>'
-    + '<a href="#contenido">Volver al inicio del aviso</a></div>'
+    + '<a href="#contenido">Volver al inicio del aviso</a>'
+    + '<a href="' + siteUrl + '">Volver al sitio web</a></div>'
     + '<footer>' + escape(policy.companyName) + ' · ' + escape(policy.title) + '</footer>'
     + '</main></body></html>';
 }
