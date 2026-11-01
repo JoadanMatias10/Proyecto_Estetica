@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchPublicCompanyInfo } from "../../utils/publicCatalogApi";
+import { API_BASE_URL } from "../../api";
 import SidebarIcon from "../ui/SidebarIcon";
 import Logo from "../../img/logo-panamericana-192.png";
 
@@ -147,7 +148,7 @@ export default function PublicFooter() {
           <ul className="space-y-2">
             <li><Link to="/quienes-somos" className="text-slate-600 hover:text-violet-600 transition-colors duration-200">Quienes somos</Link></li>
             <li><Link to="/mision-vision-valores" className="text-slate-600 hover:text-violet-600 transition-colors duration-200">Mision, vision y valores</Link></li>
-            <li><Link to="/politica-privacidad" className="text-slate-600 hover:text-violet-600 transition-colors duration-200">Politica de privacidad</Link></li>
+            <li><a href={`${API_BASE_URL}/public/privacy-policy`} className="text-slate-600 hover:text-violet-600 transition-colors duration-200">Politica de privacidad</a></li>
           </ul>
         </div>
 
